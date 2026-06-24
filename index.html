@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Konfidenz — A/B Test Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f8;--card:#fff;--border:#e2e8f0;--radius:14px;
+  --blue:#2563eb;--blue-l:#eff6ff;--blue-m:#bfdbfe;
+  --green:#059669;--green-l:#ecfdf5;--green-m:#a7f3d0;
+  --amber:#d97706;--amber-l:#fffbeb;--amber-m:#fde68a;
+  --red:#dc2626;--red-l:#fff5f5;--red-m:#fecaca;
+  --slate:#475569;--text:#1e293b;--muted:#64748b;
+  --mono:'Courier New',monospace;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ─────────────────────────────── */
+header{background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#2563eb 100%);color:#fff;padding:3rem 1.5rem 2.5rem;text-align:center}
+header h1{font-size:2.8rem;font-weight:900;letter-spacing:-.03em}
+header p{margin-top:.5rem;font-size:1.05rem;opacity:.8;max-width:520px;margin-inline:auto;line-height:1.6}
+
+/* ── Layout ──────────────────────────────── */
+.container{max-width:1160px;margin:0 auto;padding:2rem 1.25rem}
+.section{background:var(--card);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.section-title{font-size:1rem;font-weight:700;display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;color:var(--text)}
+.section-title .ico{font-size:1.15rem}
+
+/* ── Concepts ────────────────────────────── */
+.concepts-toggle{background:none;border:none;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--blue);margin-left:auto;padding:0}
+.concept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+.concept-card{background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;padding:1rem}
+.concept-card h4{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:.35rem}
+.concept-card p{font-size:.85rem;color:var(--muted);line-height:1.55}
+.concept-card p strong{color:var(--text)}
+
+/* ── Settings row ────────────────────────── */
+.settings-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem}
+
+/* ── Form elements ───────────────────────── */
+.fg{display:flex;flex-direction:column;gap:.3rem}
+.fg label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.fg input,.fg select{padding:.55rem .75rem;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;color:var(--text);outline:none;transition:border-color .15s;background:var(--card)}
+.fg input:focus,.fg select:focus{border-color:var(--blue)}
+.fg .hint{font-size:.72rem;color:var(--muted)}
+
+/* ── Groups grid ─────────────────────────── */
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;align-items:start}
+.group-card{background:#f8fafc;border:2px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;gap:.8rem;position:relative}
+.group-card.ctrl-card{border-color:#94a3b8}
+.group-header{display:flex;align-items:center;justify-content:space-between}
+.group-badge{display:inline-block;padding:.2rem .65rem;border-radius:999px;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.badge-ctrl{background:#e2e8f0;color:var(--slate)}
+.badge-variant{color:#fff}
+.rate-display{padding:.55rem .75rem;border-radius:8px;font-size:1.1rem;font-weight:800;text-align:center;background:var(--blue-l);color:var(--blue);border:1.5px solid var(--blue-m)}
+.btn-remove{background:var(--red-l);border:1.5px solid var(--red-m);color:var(--red);border-radius:7px;padding:.3rem .7rem;font-size:.78rem;font-weight:700;cursor:pointer}
+.add-card{border:2px dashed var(--border);border-radius:12px;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;cursor:pointer;background:transparent;transition:all .2s;color:var(--muted)}
+.add-card:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+.add-card span.plus{font-size:2.2rem;line-height:1}
+
+/* ── Alert ───────────────────────────────── */
+.alert{padding:.7rem 1rem;border-radius:9px;font-size:.85rem;line-height:1.5;margin-bottom:1rem}
+.alert-warn{background:var(--amber-l);border:1.5px solid var(--amber-m);color:#92400e}
+.alert-info{background:var(--blue-l);border:1.5px solid var(--blue-m);color:#1e40af}
+
+/* ── Results ─────────────────────────────── */
+.results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem}
+.result-card{border:2px solid var(--border);border-radius:12px;padding:1.25rem}
+.result-card.win{border-color:var(--green)}
+.result-card.loss{border-color:var(--red)}
+.result-card.inconclusive{border-color:var(--amber)}
+.result-card h4{font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:.6rem}
+.badge{display:inline-block;padding:.22rem .6rem;border-radius:999px;font-size:.73rem;font-weight:800;margin-bottom:.75rem}
+.badge-win{background:var(--green-l);color:var(--green)}
+.badge-loss{background:var(--red-l);color:var(--red)}
+.badge-wait{background:var(--amber-l);color:var(--amber)}
+.badge-no{background:#f1f5f9;color:var(--muted)}
+.conf-number{font-size:2.2rem;font-weight:900;text-align:center;margin:.4rem 0 .1rem}
+.conf-label{font-size:.72rem;text-align:center;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em}
+.bar-track{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-bottom:.25rem}
+.bar-fill{height:100%;border-radius:999px;transition:width .6s ease}
+.bar-labels{display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-bottom:.75rem}
+.metric{display:flex;justify-content:space-between;padding:.38rem 0;border-bottom:1px solid var(--border);font-size:.86rem}
+.metric:last-of-type{border-bottom:none}
+.ml{color:var(--muted)}
+.mv{font-weight:700}
+.mv.pos{color:var(--green)}.mv.neg{color:var(--red)}.mv.neu{color:var(--text)}
+.calc-block{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;margin-top:.75rem;font-family:var(--mono);font-size:.78rem;line-height:2}
+.cs{display:flex;justify-content:space-between}
+.ck{color:var(--muted)}.cv{font-weight:700;color:var(--text)}
+details summary{cursor:pointer;font-size:.82rem;font-weight:600;color:var(--blue);margin-top:.75rem;list-style:none}
+details summary::before{content:'▸ '}
+details[open] summary::before{content:'▾ '}
+
+/* ── Scenarios ───────────────────────────── */
+.charts-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:1.5rem}
+.chart-box{border:1.5px solid var(--border);border-radius:12px;padding:1.25rem}
+.chart-box h4{font-size:.9rem;font-weight:700;margin-bottom:.3rem}
+.chart-box p{font-size:.78rem;color:var(--muted);margin-bottom:1rem;line-height:1.5}
+.chart-wrap{position:relative;height:280px}
+.scen-inputs{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;align-items:flex-end}
+.scen-inputs .fg{flex:1;min-width:150px}
+
+/* ── Empty ───────────────────────────────── */
+.empty{text-align:center;padding:2rem;color:var(--muted);font-size:.9rem}
+
+/* ── Responsive ──────────────────────────── */
+@media(max-width:600px){
+  header h1{font-size:2rem}
+  .charts-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Konfidenz</h1>
+  <p>Find out if your A/B test results are real — or just coincidence.</p>
+</header>
+
+<div class="container">
+
+  <!-- ── 1. Concepts ───────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="ico">💡</span> Key Concepts — In Plain English
+      <button class="concepts-toggle" id="cToggle" onclick="toggleConcepts()">Hide</button>
+    </div>
+    <div id="conceptsBody">
+      <div class="concept-grid">
+        <div class="concept-card">
+          <h4>Confidence Level</h4>
+          <p>How sure are we this result is <strong>NOT just luck</strong>? 95% confidence means: if the variant truly had zero effect, you'd only get a result this extreme by random chance 5 out of 100 times. The higher, the more trustworthy.</p>
+        </div>
+        <div class="concept-card">
+          <h4>p-value</h4>
+          <p><strong>"Probability of coincidence."</strong> If there's really no difference, how often would pure luck produce a result this extreme? p = 0.04 → 4% chance it's a fluke. Confidence = 1 − p. Lower p = more confident.</p>
+        </div>
+        <div class="concept-card">
+          <h4>Null Hypothesis (H₀)</h4>
+          <p>The skeptic's claim: <em>"There is NO difference between control and variant. Any gap you see is random noise."</em> Statistics tries to shoot this down. If the evidence is strong enough, we reject H₀.</p>
+        </div>
+        <div class="concept-card">
+          <h4>Alternative Hypothesis (H₁)</h4>
+          <p>The optimist's claim: <em>"The variant actually IS different."</em> This is what you hope to prove. You only accept H₁ when there's enough evidence to confidently reject H₀.</p>
+        </div>
+        <div class="concept-card">
+          <h4>Z-Score</h4>
+          <p>The <strong>signal-to-noise ratio</strong> of your result. How many "standard widths" is the observed difference from zero? A z-score above ~1.96 means the signal is strong enough for 95% confidence.</p>
+        </div>
+        <div class="concept-card">
+          <h4>Uplift / Lift</h4>
+          <p>How much better (or worse) is the variant relative to control? <strong>+10% uplift</strong> means the variant's conversion rate is 10% higher than control's, not 10 percentage points higher — it's relative.</p>
+        </div>
+        <div class="concept-card">
+          <h4>Statistical Power</h4>
+          <p>If a real effect exists, how likely is the test to <strong>catch it</strong>? 80% power = if the variant truly wins, you'll detect it 80% of the time. Low power = you might miss real improvements.</p>
+        </div>
+        <div class="concept-card">
+          <h4>Multiple Variants &amp; Bonferroni</h4>
+          <p>Testing A vs B vs C raises your false-positive risk. With 3 comparisons at 95%, the true type-I error is ~14%. <strong>Bonferroni correction</strong> divides α by the number of variants to keep the total risk at 5%.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. Settings ───────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="ico">⚙️</span> Test Settings</div>
+    <div class="settings-row">
+      <div class="fg">
+        <label>Daily Visitors / Group</label>
+        <input type="number" id="sDailyVis" value="1000" min="1" oninput="recalc()">
+        <span class="hint">Used for scenario projections</span>
+      </div>
+      <div class="fg">
+        <label>Target Confidence</label>
+        <select id="sConf" onchange="recalc()">
+          <option value="0.90">90%</option>
+          <option value="0.95" selected>95% — standard</option>
+          <option value="0.99">99% — high-stakes</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Statistical Power</label>
+        <select id="sPower" onchange="recalc()">
+          <option value="0.80" selected>80% — standard</option>
+          <option value="0.90">90%</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Test Type</label>
+        <select id="sType" onchange="recalc()">
+          <option value="2" selected>Two-tailed (any change)</option>
+          <option value="1">One-tailed (improvement only)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. Test Groups ────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="ico">🧪</span> Test Groups</div>
+    <div id="bonferroniAlert" class="alert alert-warn" style="display:none">
+      ⚠️ <strong>Multiple variants:</strong> Running <span id="bfCount">2</span> comparisons inflates false-positive risk.
+      Significance threshold adjusted to <strong id="bfAlpha">2.5%</strong> per comparison (Bonferroni correction).
+    </div>
+    <div class="groups-grid" id="groupsGrid">
+      <!-- Control (permanent) -->
+      <div class="group-card ctrl-card" id="grp-ctrl">
+        <div class="group-header">
+          <span class="group-badge badge-ctrl">Control</span>
+        </div>
+        <div class="fg">
+          <label>Visitors</label>
+          <input type="number" id="ctrl-n" value="5000" min="1" oninput="recalc()">
+        </div>
+        <div class="fg">
+          <label>Conversions</label>
+          <input type="number" id="ctrl-c" value="250" min="0" oninput="recalc()">
+        </div>
+        <div class="fg">
+          <label>Conversion Rate</label>
+          <div class="rate-display" id="ctrl-rate">5.00%</div>
+        </div>
+      </div>
+      <!-- Variant A (pre-seeded) -->
+      <div class="group-card" id="grp-v0">
+        <div class="group-header">
+          <span class="group-badge badge-variant" id="badge-v0" style="background:#2563eb">Variant A</span>
+          <button class="btn-remove" onclick="removeVariant('v0')">✕</button>
+        </div>
+        <div class="fg">
+          <label>Visitors</label>
+          <input type="number" id="v0-n" value="5000" min="1" oninput="recalc()">
+        </div>
+        <div class="fg">
+          <label>Conversions</label>
+          <input type="number" id="v0-c" value="280" min="0" oninput="recalc()">
+        </div>
+        <div class="fg">
+          <label>Conversion Rate</label>
+          <div class="rate-display" id="v0-rate" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">5.60%</div>
+        </div>
+      </div>
+      <!-- Add button (always last) -->
+      <div class="add-card" id="addCard" onclick="addVariant()">
+        <span class="plus">+</span>
+        <span style="font-size:.85rem;font-weight:700">Add Variant</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. Results ────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="ico">📊</span> Results</div>
+    <div id="resultsGrid" class="results-grid">
+      <div class="empty">Enter data above — results appear here.</div>
+    </div>
+  </div>
+
+  <!-- ── 5. Scenarios ──────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="ico">🔭</span> Scenarios &amp; Projections</div>
+    <div class="scen-inputs">
+      <div class="fg">
+        <label>Baseline Conversion Rate (%)</label>
+        <input type="number" id="scBase" step="0.01" placeholder="auto from Control" oninput="chartsDirty=true;renderCharts()">
+        <span class="hint">Auto-filled from Control group</span>
+      </div>
+      <div class="fg">
+        <label>Daily Visitors / Group</label>
+        <input type="number" id="scVis" value="1000" min="1" oninput="chartsDirty=true;renderCharts()">
+      </div>
+      <div class="fg">
+        <label>Expected Uplift for Timeline (%)</label>
+        <input type="number" id="scUplift" step="0.5" placeholder="auto from Variant A" oninput="chartsDirty=true;renderCharts()">
+        <span class="hint">Auto-filled from first variant result</span>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <h4>📅 Days Needed vs. Expected Uplift</h4>
+        <p>How many test days do you need for different effect sizes? Smaller improvements need much longer tests. Curves show required days at different confidence targets.</p>
+        <div class="chart-wrap"><canvas id="cDays"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h4>📈 Confidence Building Over Time</h4>
+        <p>If the true uplift equals the expected value, how does your confidence grow day by day? Dashed line = your significance threshold.</p>
+        <div class="chart-wrap"><canvas id="cConf"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.container -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// STATS HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function normalCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212560 + t * 1.3302744))));
+  return z > 0 ? 1 - p : p;
+}
+
+function invNorm(p) {
+  // Rational approximation for inverse normal CDF
+  const a = [-3.969683028665376e1,2.209460984245205e2,-2.759285104469687e2,1.383577518672690e2,-3.066479806614716e1,2.506628277459239];
+  const b = [-5.447609879822406e1,1.615858368580409e2,-1.556989798598866e2,6.680131188771972e1,-1.328068155288572e1];
+  const c = [-7.784894002430293e-3,-3.223964580411365e-1,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783];
+  const d = [7.784695709041462e-3,3.224671290700398e-1,2.445134137142996,3.754408661907416];
+  const pL = 0.02425, pH = 1 - pL;
+  let q, r;
+  if (p < pL) {
+    q = Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  } else if (p <= pH) {
+    q = p - 0.5; r = q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  } else {
+    q = Math.sqrt(-2*Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+}
+
+function zTest(n1, c1, n2, c2) {
+  const p1 = c1/n1, p2 = c2/n2;
+  const pp = (c1+c2)/(n1+n2);
+  const se = Math.sqrt(pp*(1-pp)*(1/n1+1/n2));
+  if (se === 0) return { z:0, p1, p2, pp, se };
+  return { z:(p2-p1)/se, p1, p2, pp, se };
+}
+
+function pFromZ(z, tails) {
+  return tails * (1 - normalCDF(Math.abs(z)));
+}
+
+function sampleSizePerGroup(baseRate, relLift, alpha, power) {
+  const p1 = baseRate, p2 = baseRate*(1+relLift);
+  if (p2<=0||p2>=1||p1<=0||p1>=1) return Infinity;
+  const za = invNorm(1-alpha/2), zb = invNorm(power);
+  return Math.ceil(Math.pow(za+zb,2)*(p1*(1-p1)+p2*(1-p2))/Math.pow(p2-p1,2));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VARIANT STATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+const COLORS = ['#2563eb','#7c3aed','#db2777','#ea580c','#16a34a'];
+let variants = [{ id:'v0', label:'Variant A', color:COLORS[0] }];
+let nextIdx = 1;
+
+function addVariant() {
+  if (variants.length >= 5) { alert('Maximum 5 variants supported.'); return; }
+  const letter = String.fromCharCode(65 + nextIdx);
+  const id = 'v' + nextIdx;
+  const color = COLORS[variants.length];
+  variants.push({ id, label:`Variant ${letter}`, color });
+
+  const card = document.createElement('div');
+  card.className = 'group-card';
+  card.id = 'grp-' + id;
+  card.innerHTML = `
+    <div class="group-header">
+      <span class="group-badge badge-variant" id="badge-${id}" style="background:${color}">Variant ${letter}</span>
+      <button class="btn-remove" onclick="removeVariant('${id}')">✕</button>
+    </div>
+    <div class="fg">
+      <label>Visitors</label>
+      <input type="number" id="${id}-n" value="5000" min="1" oninput="recalc()">
+    </div>
+    <div class="fg">
+      <label>Conversions</label>
+      <input type="number" id="${id}-c" value="270" min="0" oninput="recalc()">
+    </div>
+    <div class="fg">
+      <label>Conversion Rate</label>
+      <div class="rate-display" id="${id}-rate" style="background:${color}18;color:${color};border-color:${color}55">—</div>
+    </div>`;
+  document.getElementById('addCard').before(card);
+  nextIdx++;
+  recalc();
+}
+
+function removeVariant(id) {
+  variants = variants.filter(v => v.id !== id);
+  document.getElementById('grp-' + id)?.remove();
+  recalc();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN RECALC
+// ─────────────────────────────────────────────────────────────────────────────
+
+function v(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+function fmt(n, d=2) { return isFinite(n) ? n.toFixed(d) : '—'; }
+function fmtPct(n) { return fmt(n*100,2)+'%'; }
+
+let chartsDirty = false;
+
+function recalc() {
+  const n1 = v('ctrl-n'), c1 = v('ctrl-c');
+  const p1 = n1 > 0 ? c1/n1 : 0;
+  document.getElementById('ctrl-rate').textContent = fmtPct(p1);
+
+  const targetConf = parseFloat(document.getElementById('sConf').value);
+  const power      = parseFloat(document.getElementById('sPower').value);
+  const tails      = parseInt(document.getElementById('sType').value);
+  const alpha      = 1 - targetConf;
+  const nVar       = variants.length;
+
+  // Bonferroni
+  const adjAlpha = alpha / nVar;
+  const adjConf  = 1 - adjAlpha;
+  const bfEl = document.getElementById('bonferroniAlert');
+  if (nVar > 1) {
+    bfEl.style.display = 'block';
+    document.getElementById('bfCount').textContent = nVar;
+    document.getElementById('bfAlpha').textContent = fmt(adjAlpha*100,2)+'%';
+  } else {
+    bfEl.style.display = 'none';
+  }
+
+  let html = '', firstUplift = null;
+
+  variants.forEach((vr, idx) => {
+    const n2 = v(vr.id+'-n'), c2 = v(vr.id+'-c');
+    const p2 = n2 > 0 ? c2/n2 : 0;
+    const rateEl = document.getElementById(vr.id+'-rate');
+    if (rateEl) rateEl.textContent = fmtPct(p2);
+
+    if (n1 < 1 || n2 < 1 || c1 < 0 || c2 < 0) return;
+
+    const { z, pp, se } = zTest(n1, c1, n2, c2);
+    const pVal    = pFromZ(z, tails);
+    const conf    = 1 - pVal;
+    const uplift  = p1 > 0 ? (p2-p1)/p1 : 0;
+    const absDiff = p2 - p1;
+
+    if (idx === 0) firstUplift = uplift;
+
+    const isWin  = conf >= adjConf && uplift > 0;
+    const isLoss = conf >= adjConf && uplift < 0;
+    const isNear = !isWin && !isLoss && conf >= adjConf * 0.85;
+    const cardCls = isWin ? 'win' : isLoss ? 'loss' : isNear ? 'inconclusive' : '';
+
+    let badgeCls, badgeTxt;
+    if (isWin)       { badgeCls='badge-win';  badgeTxt='✓ Significant Win'; }
+    else if (isLoss) { badgeCls='badge-loss'; badgeTxt='✗ Significant Loss'; }
+    else if (isNear) { badgeCls='badge-wait'; badgeTxt='⏳ Almost There'; }
+    else             { badgeCls='badge-no';   badgeTxt='✗ Not Significant Yet'; }
+
+    const confColor = isWin ? 'var(--green)' : isLoss ? 'var(--red)' : isNear ? 'var(--amber)' : 'var(--muted)';
+    const barW = Math.max(0, Math.min(100, conf*100));
+    const upCls = uplift > 0 ? 'pos' : uplift < 0 ? 'neg' : 'neu';
+    const upSign = uplift > 0 ? '+' : '';
+
+    html += `
+    <div class="result-card ${cardCls}">
+      <h4>${vr.label} vs Control</h4>
+      <span class="badge ${badgeCls}">${badgeTxt}</span>
+      <div class="conf-number" style="color:${confColor}">${fmt(conf*100,1)}%</div>
+      <div class="conf-label">Confidence Level</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${barW}%;background:${confColor}"></div></div>
+      <div class="bar-labels"><span>0%</span><span style="color:${confColor};font-weight:700">${fmt(adjConf*100,0)}% threshold</span><span>100%</span></div>
+      <div class="metric"><span class="ml">Uplift (relative)</span><span class="mv ${upCls}">${upSign}${fmt(uplift*100,2)}%</span></div>
+      <div class="metric"><span class="ml">Absolute diff.</span><span class="mv ${upCls}">${upSign}${fmt(absDiff*100,2)} pp</span></div>
+      <div class="metric"><span class="ml">Control rate</span><span class="mv neu">${fmtPct(p1)}</span></div>
+      <div class="metric"><span class="ml">${vr.label} rate</span><span class="mv neu">${fmtPct(p2)}</span></div>
+      <div class="metric"><span class="ml">Z-score</span><span class="mv neu">${fmt(z,3)}</span></div>
+      <div class="metric"><span class="ml">p-value</span><span class="mv neu">${fmt(pVal,4)}</span></div>
+      <details>
+        <summary>Show calculation steps</summary>
+        <div class="calc-block">
+          <div class="cs"><span class="ck">Control rate p₁</span><span class="cv">${fmtPct(p1)}</span></div>
+          <div class="cs"><span class="ck">${vr.label} rate p₂</span><span class="cv">${fmtPct(p2)}</span></div>
+          <div class="cs"><span class="ck">Pooled rate pₚ = (c₁+c₂)/(n₁+n₂)</span><span class="cv">${fmtPct(pp)}</span></div>
+          <div class="cs"><span class="ck">Std. Error SE = √(pₚ·(1−pₚ)·(1/n₁+1/n₂))</span><span class="cv">${fmt(se,6)}</span></div>
+          <div class="cs"><span class="ck">Z = (p₂ − p₁) / SE</span><span class="cv">${fmt(z,4)}</span></div>
+          <div class="cs"><span class="ck">p-value (${tails===2?'two':'one'}-tailed)</span><span class="cv">${fmt(pVal,4)}</span></div>
+          <div class="cs"><span class="ck">Confidence = 1 − p</span><span class="cv">${fmt(conf*100,2)}%</span></div>
+          <div class="cs"><span class="ck">Threshold (Bonferroni, ${nVar}× variants)</span><span class="cv">${fmt(adjConf*100,2)}%</span></div>
+        </div>
+      </details>
+    </div>`;
+  });
+
+  document.getElementById('resultsGrid').innerHTML = html ||
+    '<div class="empty">Add at least one variant with data to see results.</div>';
+
+  // Auto-seed scenario inputs (only if not manually overridden)
+  const scBase = document.getElementById('scBase');
+  if (!scBase.dataset.manual && p1 > 0) scBase.value = fmt(p1*100, 2);
+  const scUpl = document.getElementById('scUplift');
+  if (!scUpl.dataset.manual && firstUplift !== null) scUpl.value = fmt(firstUplift*100, 1);
+  const scVis = document.getElementById('scVis');
+  scVis.value = v('sDailyVis');
+
+  chartsDirty = true;
+  renderCharts();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+let cDays = null, cConf = null;
+
+function renderCharts() {
+  if (!chartsDirty) return;
+  chartsDirty = false;
+
+  const baseRaw  = parseFloat(document.getElementById('scBase').value);
+  const baseRate = (baseRaw || 0) / 100;
+  const dailyVis = parseFloat(document.getElementById('scVis').value) || 1000;
+  const upliftRaw = parseFloat(document.getElementById('scUplift').value);
+  const expectedUplift = (upliftRaw || 0) / 100;
+  const power    = parseFloat(document.getElementById('sPower').value);
+  const tails    = parseInt(document.getElementById('sType').value);
+  const targetConf = parseFloat(document.getElementById('sConf').value);
+
+  // ── Chart 1: Days needed vs. uplift ────────────────────────────────────────
+  const lifts = Array.from({length:50}, (_,i) => i+1);  // 1% → 50%
+  const confLevels = [
+    { conf:0.90, label:'90% confidence', color:'#f59e0b' },
+    { conf:0.95, label:'95% confidence', color:'#2563eb' },
+    { conf:0.99, label:'99% confidence', color:'#dc2626' },
+  ];
+
+  if (cDays) cDays.destroy();
+  cDays = new Chart(document.getElementById('cDays'), {
+    type: 'line',
+    data: {
+      labels: lifts.map(l => l+'%'),
+      datasets: confLevels.map(cl => ({
+        label: cl.label,
+        data: lifts.map(l => {
+          if (baseRate <= 0) return null;
+          const n = sampleSizePerGroup(baseRate, l/100, 1-cl.conf, power);
+          const days = Math.ceil(n / dailyVis);
+          return days > 0 && days <= 365 ? days : null;
+        }),
+        borderColor: cl.color, backgroundColor: cl.color+'18',
+        tension: 0.35, pointRadius: 0, borderWidth: 2, fill: false,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'top', labels:{ boxWidth:12, padding:14, font:{size:11} } },
+        tooltip: { callbacks: { label: c => c.raw !== null ? `${c.dataset.label}: ${c.raw} days` : 'needs >365 days' } }
+      },
+      scales: {
+        x: { title:{ display:true, text:'Expected Relative Uplift', font:{size:11} }, ticks:{font:{size:10}} },
+        y: { title:{ display:true, text:'Days Needed', font:{size:11} }, min:0, ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  // ── Chart 2: Confidence over time ─────────────────────────────────────────
+  const days = Array.from({length:90}, (_,i) => i+1);
+  const confData = days.map(d => {
+    if (baseRate <= 0 || expectedUplift === 0) return 0;
+    const n = d * dailyVis;
+    const p1 = baseRate, p2 = baseRate*(1+expectedUplift);
+    if (p2<=0||p2>=1) return 0;
+    const pp = (p1+p2)/2;
+    const se = Math.sqrt(pp*(1-pp)*(2/n));
+    const z = (p2-p1)/se;
+    return Math.max(0, Math.min(100, (1-pFromZ(z,tails))*100));
+  });
+
+  if (cConf) cConf.destroy();
+  cConf = new Chart(document.getElementById('cConf'), {
+    type: 'line',
+    data: {
+      labels: days.map(d => 'Day '+d),
+      datasets: [
+        {
+          label: `Confidence at ${fmt(expectedUplift*100,1)}% uplift`,
+          data: confData,
+          borderColor:'#2563eb', backgroundColor:'#2563eb18', fill:true,
+          tension:0.4, pointRadius:0, borderWidth:2,
+        },
+        {
+          label: `Target (${fmt(targetConf*100,0)}%)`,
+          data: days.map(() => targetConf*100),
+          borderColor:'#10b981', borderWidth:2, borderDash:[6,4],
+          pointRadius:0, fill:false,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'top', labels:{ boxWidth:12, padding:14, font:{size:11} } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${typeof c.raw==='number'?c.raw.toFixed(1)+'%':c.raw}` } }
+      },
+      scales: {
+        x: { title:{ display:true, text:'Test Day', font:{size:11} }, ticks:{maxTicksLimit:10,font:{size:10}} },
+        y: { title:{ display:true, text:'Confidence (%)', font:{size:11} }, min:0, max:100, ticks:{font:{size:10}} }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function toggleConcepts() {
+  const body = document.getElementById('conceptsBody');
+  const btn  = document.getElementById('cToggle');
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? 'Hide' : 'Show';
+}
+
+// Mark scenario inputs as manually set so auto-fill stops overriding them
+['scBase','scUplift'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function(){
+    this.dataset.manual = '1';
+    chartsDirty = true;
+    renderCharts();
+  });
+});
+
+// Boot
+recalc();
+</script>
+</body>
+</html>
