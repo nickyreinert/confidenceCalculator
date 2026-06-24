@@ -677,6 +677,30 @@ header p {
   .groups-grid{flex-wrap:wrap}
   .group-col{flex:0 0 180px;min-width:180px}
 }
+
+/* ── Mobile: row-based layout for narrow screens ── */
 @media(max-width:640px){
-  .group-col{flex:0 0 160px;min-width:160px}
+  .groups-grid{
+    flex-direction:column;
+    flex-wrap:nowrap;
+    overflow-x:visible;
+    gap:var(--space-4);
+  }
+  .group-col{
+    flex:1 1 auto;
+    min-width:100%;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:var(--space-3);
+  }
+  .group-col--add{
+    min-width:100%;
+  }
+  .ctrl-result-spacer{display:none}
+
+  /* Stack group row and result card vertically, both full-width */
+  .group-col .group-row,
+  .group-col .result-card-slot{
+    width:100%;
+  }
 }
