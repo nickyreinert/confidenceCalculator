@@ -357,16 +357,12 @@ function recalc() {
         <div class="cc-divider"></div>
 
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Confidence = 1 − p <button class="help-btn" data-tooltip="${CONCEPTS.confidence.tooltip}" onclick="openConcept('confidence')">?</button></span>
+          <span class="cc-key cc-key--result">Confidence = 1 − p <button class="help-btn" data-tooltip="What we observed: probability this result is NOT due to chance. ${fmt(conf*100,2)}% means ${fmt(conf*100,2)}% sure the variant differs from control." onclick="openConcept('confidence')">?</button></span>
           <span class="cc-val cc-val--result" style="color:${confColor}">${fmt(conf*100,2)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Threshold (${nVar}× Bonferroni) <button class="help-btn" data-tooltip="${CONCEPTS.bonferroni.tooltip}" onclick="openConcept('bonferroni')">?</button></span>
+          <span class="cc-key cc-key--result">Threshold (${nVar}× Bonferroni) <button class="help-btn" data-tooltip="What we need: confidence required to declare a winner. At ${nVar} variants, must reach ${fmt(adjConf*100,2)}% (not just 95%). Currently ${fmt(conf*100,2)}% — need ${Math.max(0, fmt(adjConf*100,2) - fmt(conf*100,2))}% more." onclick="openConcept('bonferroni')">?</button></span>
           <span class="cc-val cc-val--result">${fmt(adjConf*100,2)}%</span>
-        </div>
-        <div class="cc-step cc-result" style="opacity:0.7;font-size:var(--text-2xs)">
-          <span class="cc-key cc-key--result">Test power <button class="help-btn" data-tooltip="${CONCEPTS.power.tooltip}" onclick="openConcept('power')">?</button></span>
-          <span class="cc-val cc-val--result" style="color:var(--text-faint)">${fmt(power*100,0)}%</span>
         </div>
 
         <div class="cc-divider"></div>
