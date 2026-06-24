@@ -451,7 +451,7 @@ function renderCharts() {
   if (p1 > 0 && expectedUplift !== 0) {
     const crossTxt = crossUnit
       ? `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit}</strong> (${crossUnit - since} more)`
-      : `does not reach <strong>${fmt(targetConf*100,0)}%</strong> within ${MAX_UNITS} units`;
+      : `does not reach <strong>${fmt(targetConf*100,0)}%</strong> within ${MAX_UNITS} time units`;
 
     // Calculate required sample size per group for context
     const reqSample = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, power);
@@ -461,7 +461,7 @@ function renderCharts() {
 
     statEl.innerHTML = `
       <div class="scen-stat">
-        <span class="scen-stat-label">Control rate</span>
+        <span class="scen-stat-label">Control Conversion rate</span>
         <span class="scen-stat-val">${fmtPct(p1)}</span>
       </div>
       <div class="scen-stat">
