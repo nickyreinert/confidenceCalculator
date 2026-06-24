@@ -831,17 +831,28 @@ function restoreFromParams() {
 
 function copyChart(chartId) {
   const canvas = document.getElementById(chartId);
+  const btn = event?.target?.closest('.chart-copy-btn');
   if (!canvas) return;
+
   canvas.toBlob(blob => {
-    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(() => {
-      const btn = event.target.closest('.chart-copy-btn');
-      if (btn) {
-        const origContent = btn.innerHTML;
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
-        setTimeout(() => btn.innerHTML = origContent, 1500);
-      }
-    }).catch(() => alert('Failed to copy chart'));
-  });
+    if (!blob) {
+      alert('Failed to capture chart');
+      return;
+    }
+
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      .then(() => {
+        if (btn) {
+          const origContent = btn.innerHTML;
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+          setTimeout(() => btn.innerHTML = origContent, 1500);
+        }
+      })
+      .catch(err => {
+        console.error('Copy failed:', err);
+        alert('Failed to copy chart. Your browser may not support this feature.');
+      });
+  }, 'image/png');
 }
 
 // Boot: restore from URL or render defaults
