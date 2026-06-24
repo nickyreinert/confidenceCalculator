@@ -259,13 +259,6 @@ function recalc() {
   const alpha      = 1 - targetConf;
   const nVar       = variants.length;
 
-  // Update power explanation
-  const powerCalcEl = document.getElementById('powerCalc');
-  if (powerCalcEl) {
-    const zBeta = power >= 0.85 ? 1.28 : 0.84;
-    powerCalcEl.innerHTML = `z_β = ${zBeta} (power ${fmt(power*100,0)}%)<br>Higher power → larger z_β → need more visitors`;
-  }
-
   const adjAlpha = alpha / nVar;
   const adjConf  = 1 - adjAlpha;
   const bfEl = document.getElementById('bonferroniAlert');
@@ -408,7 +401,7 @@ function recalc() {
 // CHARTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-let cConf = null, cVis = null;
+let cConf = null, cVis = null, cPowerVis = null, cPowerTime = null;
 
 function confAtUnit(unit, visPerUnit, p1, p2, tails) {
   if (p1 <= 0 || p2 <= 0 || p2 >= 1 || visPerUnit < 1) return 0;
@@ -652,6 +645,99 @@ function renderCharts() {
         y: {
           title: { display: true, text: 'Confidence (%)', font: { size: 11 } },
           min: 0, max: 100,
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
+  });
+
+  // ── Power planning charts ──────────────────────────────────────────────
+  const powerLevels = [0.70, 0.75, 0.80, 0.85, 0.90, 0.95];
+  const powerLabels = powerLevels.map(p => `${fmt(p*100,0)}%`);
+
+  // Chart 3: Visitors needed at each power level
+  const visitorsByPower = powerLevels.map(p => {
+    const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
+    return isFinite(n) ? n : null;
+  });
+
+  if (cPowerVis) cPowerVis.destroy();
+  cPowerVis = new Chart(document.getElementById('cPowerVis'), {
+    type: 'bar',
+    data: {
+      labels: powerLabels,
+      datasets: [{
+        label: 'Visitors per group',
+        data: visitorsByPower,
+        borderColor: '#4f78d6',
+        backgroundColor: 'rgba(79,120,214,0.2)',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => c.raw !== null ? `${Math.round(c.raw).toLocaleString()} visitors` : null
+          }
+        }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Visitors per group', font: { size: 11 } },
+          ticks: { font: { size: 10 }, callback: v => v.toLocaleString() }
+        },
+        x: {
+          title: { display: true, text: 'Power level', font: { size: 11 } },
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
+  });
+
+  // Chart 4: Time to reach sample size (in units)
+  const visPerUnit = parseFloat(document.getElementById('scVis').value) || 1000;
+  const timeByPower = powerLevels.map(p => {
+    const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
+    return isFinite(n) ? Math.ceil(n / visPerUnit) : null;
+  });
+
+  if (cPowerTime) cPowerTime.destroy();
+  cPowerTime = new Chart(document.getElementById('cPowerTime'), {
+    type: 'line',
+    data: {
+      labels: powerLabels,
+      datasets: [{
+        label: 'Units to reach sample size',
+        data: timeByPower,
+        borderColor: '#7c3aed',
+        backgroundColor: 'rgba(124,58,237,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 5,
+        pointBackgroundColor: '#7c3aed',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => c.raw !== null ? `${Math.round(c.raw)} units` : null
+          }
+        }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Time units', font: { size: 11 } },
+          ticks: { font: { size: 10 }, callback: v => Math.round(v) }
+        },
+        x: {
+          title: { display: true, text: 'Power level', font: { size: 11 } },
           ticks: { font: { size: 10 } }
         }
       }

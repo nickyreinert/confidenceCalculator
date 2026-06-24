@@ -72,6 +72,7 @@
       </div>
     </div>
 
+      
     <!-- Test settings -->
     <div class="sidebar-settings">
       <div class="radio-group">
@@ -86,15 +87,10 @@
         </div>
       </div>
       <div class="radio-group">
-        <span class="radio-label">Power <button class="help-btn" data-tooltip="If a real effect exists, how likely is your test to detect it? 80% is standard." onclick="openConcept('power')">?</button></span>
+        <span class="radio-label">Power <button class="help-btn" data-tooltip="Planning only: how many visitors you need to detect the effect. Higher power = need more visitors. Does not affect observed results." onclick="openConcept('power')">?</button></span>
         <div class="radio-pills" id="powerRadios">
           <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
           <label class="radio-pill"><input type="radio" name="sPower" value="0.90" onchange="recalc()"><span>90%</span></label>
-        </div>
-        <div class="power-explainer">
-          <div class="power-formula">n = (z_α + z_β)² · (p₁·(1-p₁) + p₂·(1-p₂)) / (p₂-p₁)²</div>
-          <div class="power-note">where z_β depends on power: 80% power = z_β of 0.84; 90% power = z_β of 1.28</div>
-          <div class="power-calc" id="powerCalc"></div>
         </div>
       </div>
       <div class="radio-group">
@@ -173,6 +169,34 @@
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cVis"></canvas></div>
           <div class="scen-chart-sub" style="margin-top:var(--space-3)">Confidence over time at different visitor volumes — how much does traffic matter?</div>
+        </div>
+      </div>
+
+      <!-- Power planning charts -->
+      <div class="proj-charts-row">
+        <div class="chart-box">
+          <div class="chart-box-header">
+            <div class="chart-title-group">
+              <div class="scen-chart-title">Visitors needed by power</div>
+            </div>
+            <button class="chart-copy-btn" onclick="copyChart('cPowerVis')" aria-label="Copy chart image" title="Copy chart">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+            </button>
+          </div>
+          <div class="chart-wrap" style="height:280px"><canvas id="cPowerVis"></canvas></div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Sample size per group at different power levels</div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-box-header">
+            <div class="chart-title-group">
+              <div class="scen-chart-title">Time to power target</div>
+            </div>
+            <button class="chart-copy-btn" onclick="copyChart('cPowerTime')" aria-label="Copy chart image" title="Copy chart">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+            </button>
+          </div>
+          <div class="chart-wrap" style="height:280px"><canvas id="cPowerTime"></canvas></div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">How long until you reach the required sample size</div>
         </div>
       </div>
     </section>
