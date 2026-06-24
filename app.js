@@ -364,6 +364,10 @@ function recalc() {
           <span class="cc-key cc-key--result">Threshold (${nVar}× Bonferroni) <button class="help-btn" data-tooltip="${CONCEPTS.bonferroni.tooltip}" onclick="openConcept('bonferroni')">?</button></span>
           <span class="cc-val cc-val--result">${fmt(adjConf*100,2)}%</span>
         </div>
+        <div class="cc-step cc-result" style="opacity:0.7;font-size:var(--text-2xs)">
+          <span class="cc-key cc-key--result">Test power <button class="help-btn" data-tooltip="${CONCEPTS.power.tooltip}" onclick="openConcept('power')">?</button></span>
+          <span class="cc-val cc-val--result" style="color:var(--text-faint)">${fmt(power*100,0)}%</span>
+        </div>
 
         <div class="cc-divider"></div>
 
