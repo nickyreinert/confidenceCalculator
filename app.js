@@ -733,7 +733,7 @@ function renderCharts() {
       scales: {
         y: {
           title: { display: true, text: 'Time units', font: { size: 11 } },
-          ticks: { font: { size: 10 }, callback: v => Math.round(v) }
+          ticks: { font: { size: 10 }, callback: v => Math.round(v).toLocaleString() }
         },
         x: {
           title: { display: true, text: 'Power level', font: { size: 11 } },
