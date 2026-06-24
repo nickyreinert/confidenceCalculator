@@ -155,14 +155,25 @@
       <div class="scen-stat-row" id="scenStatRow"></div>
       <div class="proj-charts-row">
         <div class="chart-box">
+          <div class="chart-box-header">
+            <div class="chart-title-group">
+              <div class="chart-box-title">Confidence over time</div>
+            </div>
+            <button class="chart-copy-btn" onclick="copyChart('cConf')" aria-label="Copy chart image" title="Copy chart">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+            </button>
+          </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cConf"></canvas></div>
         </div>
         <div class="chart-box">
-          <div class="scen-chart-header">
-            <div>
+          <div class="chart-box-header">
+            <div class="chart-title-group">
               <div class="scen-chart-title">Traffic sensitivity</div>
               <div class="scen-chart-sub">Confidence over time at different visitor volumes — how much does traffic matter?</div>
             </div>
+            <button class="chart-copy-btn" onclick="copyChart('cVis')" aria-label="Copy chart image" title="Copy chart">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+            </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cVis"></canvas></div>
         </div>
