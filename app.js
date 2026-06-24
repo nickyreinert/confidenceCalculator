@@ -361,7 +361,7 @@ function recalc() {
           <span class="cc-val cc-val--result" style="color:${confColor}">${fmt(conf*100,2)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Threshold (${nVar}× Bonferroni) <button class="help-btn" data-tooltip="What we need: confidence required to declare a winner. At ${nVar} variants, must reach ${fmt(adjConf*100,2)}% (not just 95%). Currently ${fmt(conf*100,2)}% — need ${Math.max(0, fmt(adjConf*100,2) - fmt(conf*100,2))}% more." onclick="openConcept('bonferroni')">?</button></span>
+          <span class="cc-key cc-key--result">Threshold <button class="help-btn" data-tooltip="Required: ${fmt(adjConf*100,2)}% = 95% ÷ ${nVar} variants. Observed: ${fmt(conf*100,2)}%. Gap: ${Math.max(0, fmt(adjConf*100,2) - fmt(conf*100,2))}%." onclick="openConcept('bonferroni')">?</button></span>
           <span class="cc-val cc-val--result">${fmt(adjConf*100,2)}%</span>
         </div>
 
