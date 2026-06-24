@@ -259,6 +259,13 @@ function recalc() {
   const alpha      = 1 - targetConf;
   const nVar       = variants.length;
 
+  // Update power explanation
+  const powerCalcEl = document.getElementById('powerCalc');
+  if (powerCalcEl) {
+    const zBeta = power >= 0.85 ? 1.28 : 0.84;
+    powerCalcEl.innerHTML = `z_β = ${zBeta} (power ${fmt(power*100,0)}%)<br>Higher power → larger z_β → need more visitors`;
+  }
+
   const adjAlpha = alpha / nVar;
   const adjConf  = 1 - adjAlpha;
   const bfEl = document.getElementById('bonferroniAlert');

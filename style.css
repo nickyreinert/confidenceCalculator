@@ -406,6 +406,31 @@ header p {
 }
 .radio-pill:hover span{color:var(--text-strong)}
 
+/* ── Power explainer ── */
+.power-explainer{
+  margin-top:var(--space-2);
+  padding:var(--space-2) var(--space-3);
+  background:var(--surface-sunken);
+  border-radius:var(--radius-sm);
+  border-left:2px solid var(--accent);
+  font-size:var(--text-2xs);
+}
+.power-formula{
+  font-family:var(--font-mono);
+  color:var(--text-strong);
+  margin-bottom:var(--space-1);
+}
+.power-note{
+  color:var(--text-muted);
+  line-height:var(--lh-snug);
+  margin-bottom:var(--space-1);
+}
+.power-calc{
+  color:var(--text-body);
+  font-family:var(--font-mono);
+  font-weight:var(--fw-semibold);
+}
+
 /* ── Form group ── */
 .fg{display:flex;flex-direction:column;gap:var(--space-1)}
 .fg label {

@@ -91,6 +91,11 @@
           <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
           <label class="radio-pill"><input type="radio" name="sPower" value="0.90" onchange="recalc()"><span>90%</span></label>
         </div>
+        <div class="power-explainer">
+          <div class="power-formula">n = (z_α + z_β)² · (p₁·(1-p₁) + p₂·(1-p₂)) / (p₂-p₁)²</div>
+          <div class="power-note">where z_β depends on power: 80% power = z_β of 0.84; 90% power = z_β of 1.28</div>
+          <div class="power-calc" id="powerCalc"></div>
+        </div>
       </div>
       <div class="radio-group">
         <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed tests any direction; one-tailed only detects improvement." onclick="openConcept('althypothesis')">?</button></span>
