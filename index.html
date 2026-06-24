@@ -47,31 +47,27 @@
         </div>
       </div>
 
-      <!-- Control group card -->
-      <div class="group-row ctrl-row" id="grp-ctrl" style="margin-top:var(--space-3)">
-        <div class="group-row-header">
-          <span class="group-badge badge-ctrl">Control</span>
+      <!-- Control group section -->
+      <div class="sidebar-section-label">Control</div>
+      <div class="sidebar-control" id="grp-ctrl">
+        <div class="fg dist-fg">
+          <label>Distribution</label>
+          <div class="knob-row">
+            <input type="range" id="ctrl-dist" value="50" min="1" max="99" step="1" class="dist-knob" oninput="onDistKnob('ctrl',this.value)" onchange="onDistKnob('ctrl',this.value)">
+            <span class="dist-knob-val" id="ctrl-dist-val">50%</span>
+          </div>
         </div>
-        <div class="group-row-fields">
-          <div class="fg dist-fg">
-            <label>Distribution</label>
-            <div class="knob-row">
-              <input type="range" id="ctrl-dist" value="50" min="1" max="99" step="1" class="dist-knob" oninput="onDistKnob('ctrl',this.value)" onchange="onDistKnob('ctrl',this.value)">
-              <span class="dist-knob-val" id="ctrl-dist-val">50%</span>
-            </div>
-          </div>
-          <div class="fg">
-            <label>Visitors</label>
-            <input type="number" id="ctrl-n" value="5000" min="1" oninput="onVisitorsChange('ctrl')">
-          </div>
-          <div class="fg">
-            <label>Conversions</label>
-            <input type="number" id="ctrl-c" value="250" min="0" oninput="recalc()">
-          </div>
-          <div class="fg">
-            <label>Rate</label>
-            <div class="rate-display" id="ctrl-rate">5.00%</div>
-          </div>
+        <div class="fg">
+          <label>Visitors</label>
+          <input type="number" id="ctrl-n" value="5000" min="1" oninput="onVisitorsChange('ctrl')">
+        </div>
+        <div class="fg">
+          <label>Conversions</label>
+          <input type="number" id="ctrl-c" value="250" min="0" oninput="recalc()">
+        </div>
+        <div class="fg">
+          <label>Rate</label>
+          <div class="rate-display" id="ctrl-rate">5.00%</div>
         </div>
       </div>
     </div>
