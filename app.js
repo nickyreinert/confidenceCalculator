@@ -448,6 +448,15 @@ function renderCharts() {
     const crossTxt = crossUnit
       ? `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit}</strong> (${crossUnit - since} more)`
       : `does not reach <strong>${fmt(targetConf*100,0)}%</strong> within ${MAX_UNITS} units`;
+
+    // Calculate required sample size based on power setting
+    const reqSamplePerGroup = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, power);
+    const reqUnits = isFinite(reqSamplePerGroup) ? Math.ceil(reqSamplePerGroup / visPerUnit) : null;
+
+    const powerNote = reqUnits && p1 > 0
+      ? `Power ${fmt(power*100,0)}% requires ~${reqUnits} units per group`
+      : 'Add uplift estimate to see power-based sample size';
+
     statEl.innerHTML = `
       <div class="scen-stat">
         <span class="scen-stat-label">Control rate</span>
@@ -464,6 +473,10 @@ function renderCharts() {
       <div class="scen-stat scen-stat--wide">
         <span class="scen-stat-label">Projection</span>
         <span class="scen-stat-val">${crossTxt}</span>
+      </div>
+      <div class="scen-stat scen-stat--wide" style="background:var(--surface-sunken);padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);border-left:3px solid var(--accent)">
+        <span class="scen-stat-label">Why power matters</span>
+        <span class="scen-stat-val" style="font-size:var(--text-2xs);margin-top:var(--space-1)">${powerNote}</span>
       </div>`;
   } else {
     statEl.innerHTML = `<div class="scen-stat scen-stat--wide"><span class="scen-stat-label">Add a variant with conversions to see the projection.</span></div>`;
