@@ -449,6 +449,12 @@ function renderCharts() {
       ? `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit}</strong> (${crossUnit - since} more)`
       : `does not reach <strong>${fmt(targetConf*100,0)}%</strong> within ${MAX_UNITS} units`;
 
+    // Calculate required sample size per group for context
+    const reqSample = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, power);
+    const sampleDisplay = isFinite(reqSample)
+      ? `${Math.round(reqSample).toLocaleString()} visitors`
+      : '—';
+
     statEl.innerHTML = `
       <div class="scen-stat">
         <span class="scen-stat-label">Control rate</span>
@@ -459,12 +465,12 @@ function renderCharts() {
         <span class="scen-stat-val">${upliftRaw > 0 ? '+' : ''}${fmt(upliftRaw,1)}% → ${fmtPct(p2)}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Confidence now (unit ${since})</span>
+        <span class="scen-stat-label">Confidence now</span>
         <span class="scen-stat-val ${confAtSince >= targetConf*100 ? 'pos' : ''}">${fmt(confAtSince,2)}%</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Power</span>
-        <span class="scen-stat-val">${fmt(power*100,0)}%</span>
+        <span class="scen-stat-label">Power ${fmt(power*100,0)}% needs</span>
+        <span class="scen-stat-val" title="Sample size per group at power level">${sampleDisplay}</span>
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">Projection</span>
