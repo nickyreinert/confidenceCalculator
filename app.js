@@ -687,7 +687,7 @@ function renderCharts() {
       scales: {
         y: {
           title: { display: true, text: 'Visitors per group', font: { size: 11 } },
-          ticks: { font: { size: 10 }, callback: v => v.toLocaleString() }
+          ticks: { font: { size: 10 }, callback: v => Math.round(v).toLocaleString() }
         },
         x: {
           title: { display: true, text: 'Power level', font: { size: 11 } },
