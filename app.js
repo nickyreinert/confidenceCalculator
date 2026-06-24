@@ -698,7 +698,6 @@ function renderCharts() {
   });
 
   // Chart 4: Time to reach sample size (in units)
-  const visPerUnit = parseFloat(document.getElementById('scVis').value) || 1000;
   const timeByPower = powerLevels.map(p => {
     const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
     return isFinite(n) ? Math.ceil(n / visPerUnit) : null;
