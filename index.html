@@ -114,9 +114,9 @@
         <span class="hint">Per group (day / week / …)</span>
       </div>
       <div class="fg">
-        <label>Expected uplift (%) <button class="help-btn" data-tooltip="Relative improvement of variant vs control. +10% uplift ≠ +10 percentage points." onclick="openConcept('uplift')">?</button></label>
+        <label>Expected uplift (%) <button class="help-btn" data-tooltip="Your assumption about the effect size for planning. Higher uplift = need fewer visitors. Relative: +10% uplift ≠ +10 percentage points." onclick="openConcept('uplift')">?</button></label>
         <input type="number" id="scUplift" step="0.5" placeholder="auto" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Auto-filled from first variant</span>
+        <span class="hint">Planning assumption — drives power charts</span>
       </div>
     </div>
   </aside>
@@ -182,7 +182,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerVis"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Sample size per group at different power levels</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Based on your expected uplift assumption — larger effect = fewer visitors needed</div>
         </div>
         <div class="chart-box">
           <div class="chart-box-header">
@@ -194,7 +194,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerTime"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">How long until you reach the required sample size</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct — when you'll hit required sample size</div>
         </div>
       </div>
     </section>
