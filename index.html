@@ -31,11 +31,8 @@
   <!-- ── LEFT SIDEBAR: controls only ─────────────────────────────────── -->
   <aside class="groups-sidebar">
     <div class="gs-header">
-      <div class="gs-title-row">
-        <span class="gs-title">Test Groups</span>
-      </div>
       <div class="fg traffic-total">
-        <label>Total Daily Visitors</label>
+        <label>Overall Visitors</label>
         <div class="traffic-row">
           <input type="number" id="sTotalVis" value="10000" min="1" oninput="onTotalVisChange()">
           <button class="gs-even-btn" onclick="distributeEvenly()" aria-label="Distribute evenly">
@@ -48,7 +45,7 @@
       </div>
 
       <!-- Control group section -->
-      <div class="sidebar-section-label">Control</div>
+      <div class="sidebar-section-label">Control Group</div>
       <div class="sidebar-control" id="grp-ctrl">
         <div class="fg dist-fg">
           <label>Distribution</label>
@@ -72,9 +69,10 @@
       </div>
     </div>
 
-      
+
     <!-- Test settings -->
     <div class="sidebar-settings">
+      <div class="sidebar-section-label">Parameters</div>  
       <div class="radio-group">
         <span class="radio-label">Confidence <button class="help-btn" data-tooltip="How sure are we this result is not just luck? Higher = more trustworthy." onclick="openConcept('confidence')">?</button></span>
         <div class="radio-pills" id="confRadios">
