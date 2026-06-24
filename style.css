@@ -299,6 +299,16 @@ header p {
   display:flex;flex-direction:column;gap:var(--space-3);
 }
 .ctrl-row{box-shadow:var(--nm-raised-md), 0 0 0 1.5px var(--border-hair)}
+
+/* ── Control row in sidebar ── */
+.gs-header .ctrl-row{
+  padding:var(--space-3);
+  gap:var(--space-2);
+  font-size:var(--text-sm);
+}
+.gs-header .ctrl-row .fg{gap:var(--space-1)}
+.gs-header .ctrl-row label{font-size:var(--text-2xs)}
+.gs-header .group-row-header{margin-bottom:var(--space-2)}
 .group-row-header{display:flex;align-items:center;justify-content:space-between}
 .group-row-fields{display:flex;flex-direction:column;gap:var(--space-2)}
 .group-row-fields .fg{min-width:0}
