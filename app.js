@@ -361,7 +361,7 @@ function recalc() {
           <span class="cc-val cc-val--result" style="color:${confColor}">${fmt(conf*100,2)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Threshold (Bonferroni) <button class="help-btn" data-tooltip="With ${nVar} variants: 5% error ÷ ${nVar} = ${fmt(5/nVar,2)}% per variant. Confidence = 100% - ${fmt(5/nVar,2)}% = ${fmt(adjConf*100,2)}%. You have ${fmt(conf*100,2)}%, need ${fmt(adjConf*100,2)}%." onclick="openConcept('bonferroni')">?</button></span>
+          <span class="cc-key cc-key--result">Threshold (Bonferroni) <button class="help-btn" data-tooltip="With ${nVar} variants: ${fmt(alpha*100,3)}% error ÷ ${nVar} = ${fmt(adjAlpha*100,3)}% per variant. Confidence = 100% − ${fmt(adjAlpha*100,3)}% = ${fmt(adjConf*100,3)}%. You have ${fmt(conf*100,2)}%, need ${fmt(adjConf*100,3)}%." onclick="openConcept('bonferroni')">?</button></span>
           <span class="cc-val cc-val--result">${fmt(adjConf*100,2)}%</span>
         </div>
 
