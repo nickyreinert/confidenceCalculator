@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CONFIDENCE — A/B Test Calculator</title>
+<meta name="description" content="A simple confidence calculator for A/B tests. Calculate confidence levels, p-values, power, uplift, visitor needs and Bonferroni-adjusted thresholds without pretending you need to be a data scientist.">
 <link rel="stylesheet" href="style.css">
 <script>
 (function(){const t=new URLSearchParams(location.search).get('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);})();
@@ -16,7 +17,7 @@
   <div class="header-inner">
     <div class="header-brand">
       <h1>CONFIDENCE</h1>
-      <p>by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
+      <p>A/B testing made easy — by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
     </div>
     <div class="header-actions">
       <label class="calc-toggle" aria-label="Show calculation details" title="Show / hide calculation details">
@@ -93,7 +94,7 @@
     <div class="sidebar-settings">
       <div class="sidebar-section-label">Parameters</div>  
       <div class="radio-group">
-        <span class="radio-label">Confidence <button class="help-btn" data-tooltip="How sure are we this result is not just luck? Higher = more trustworthy." onclick="openConcept('confidence')">?</button></span>
+        <span class="radio-label">Confidence <button class="help-btn" data-tooltip="Your chosen threshold. In this calculator, confidence is shown as 1 − p-value: higher confidence means lower Type-I error risk, not a guarantee." onclick="openConcept('confidence')">?</button></span>
         <div class="radio-pills" id="confRadios">
           <label class="radio-pill"><input type="radio" name="sConf" value="0.90" onchange="recalc()"><span>90%</span></label>
           <label class="radio-pill"><input type="radio" name="sConf" value="0.95" checked onchange="recalc()"><span>95%</span></label>
@@ -104,7 +105,7 @@
         </div>
       </div>
       <div class="radio-group">
-        <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed tests any direction; one-tailed only detects improvement." onclick="openConcept('althypothesis')">?</button></span>
+        <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed checks both directions: increase or decrease. One-tailed checks only one direction and reaches confidence faster, but can miss the opposite effect." onclick="openConcept('althypothesis')">?</button></span>
         <div class="radio-pills" id="typeRadios">
           <label class="radio-pill"><input type="radio" name="sType" value="2" checked onchange="recalc()"><span>Two-tailed</span></label>
           <label class="radio-pill"><input type="radio" name="sType" value="1" onchange="recalc()"><span>One-tailed</span></label>
@@ -114,7 +115,7 @@
       <!-- Projection inputs -->
       <div id="projectionSidebarLabel" class="sidebar-section-label">Projection</div>
       <div class="radio-group" id="powerRadioGroup">
-        <span class="radio-label">Power <button class="help-btn" data-tooltip="Planning only: how many visitors you need to detect the effect. Higher power = need more visitors. Does not affect observed results." onclick="openConcept('power')">?</button></span>
+        <span class="radio-label">Power <button class="help-btn" data-tooltip="Planning only: if a real effect exists, how likely is this test to detect it? Higher power lowers false-negative risk, but needs more visitors." onclick="openConcept('power')">?</button></span>
         <div class="radio-pills" id="powerRadios">
           <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
           <label class="radio-pill"><input type="radio" name="sPower" value="0.90" onchange="recalc()"><span>90%</span></label>
@@ -125,12 +126,15 @@
       <div class="fg">
         <label>Running since</label>
         <input type="number" id="scSince" value="1" min="1" step="1" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Time units the test has been live</span>
+        <span class="hint">Time units the test has been live — days, weeks, whatever you use consistently</span>
       </div>
       <div class="fg">
-        <label>Expected uplift (%) <button class="help-btn" data-tooltip="Your assumption about the effect size for planning. Higher uplift = need fewer visitors. Relative: +10% uplift ≠ +10 percentage points." onclick="openConcept('uplift')">?</button></label>
+        <label>Expected uplift (%) <button class="help-btn" data-tooltip="Your planning assumption about the effect size. It is relative: from 5% to 5.5% conversion is +10% uplift, not +10 percentage points." onclick="openConcept('uplift')">?</button></label>
         <input type="number" id="scUplift" step="0.5" placeholder="auto" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Planning assumption — drives power charts</span>
+        <span class="hint">Expected or observed relative change — drives power charts</span>
+      </div>
+      <div class="alert alert-info sidebar-help-note">
+        Plan the target before you stare at the result: confidence threshold, running time and visitors. Checking every day and stopping the second it looks good is p-hacking. <button class="help-btn" data-tooltip="Define the target first. Otherwise one lucky day can make noise look like a winner." onclick="openConcept('pvalue')">?</button>
       </div>
     </div>
   </aside>
@@ -140,7 +144,7 @@
 
     <!-- Bonferroni alert -->
     <div id="bonferroniAlert" class="alert alert-warn" style="display:none">
-      With <strong id="bfCount">2</strong> variants running simultaneously, each result needs to reach <strong id="bfAlpha">97.5%</strong> confidence to count as a win — not <strong id="bfTargetConf">95%</strong>. The more variants you test at once, the higher that bar gets. <button class="help-btn" data-tooltip="Running multiple variants at once makes it more likely you stumble on a 'winner' by pure chance. Raising the bar per comparison keeps your overall risk in check." onclick="openConcept('bonferroni')">?</button>
+      With <strong id="bfCount">2</strong> variants running simultaneously, each result needs to reach <strong id="bfAlpha">97.5%</strong> confidence to count as a win — not <strong id="bfTargetConf">95%</strong>. The more variants you test at once, the higher that bar gets. <button class="help-btn" data-tooltip="More variants means more chances to find a lucky winner. Bonferroni divides the significance level by the number of comparisons, so the per-variant bar gets stricter." onclick="openConcept('bonferroni')">?</button>
     </div>
 
     <!-- Group + result columns grid -->
@@ -180,7 +184,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cVis"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Confidence over time at different visitor volumes — how much does traffic matter?</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Confidence over time at different visitor volumes — because traffic decides how fast evidence piles up</div>
         </div>
       </div>
 
@@ -196,7 +200,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerVis"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Based on your expected uplift assumption — larger effect = fewer visitors needed</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Based on your expected uplift assumption — larger real effect = fewer visitors needed</div>
         </div>
         <div class="chart-box">
           <div class="chart-box-header">
@@ -208,7 +212,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerTime"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct — when you'll hit required sample size</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct — when the test should have enough visitors</div>
         </div>
       </div>
     </section>

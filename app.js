@@ -357,7 +357,7 @@ function recalc() {
         <div class="cc-divider"></div>
 
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Confidence = 1 − p <button class="help-btn" data-tooltip="What we observed: probability this result is NOT due to chance. ${fmt(conf*100,2)}% means ${fmt(conf*100,2)}% sure the variant differs from control." onclick="openConcept('confidence')">?</button></span>
+          <span class="cc-key cc-key--result">Confidence = 1 − p <button class="help-btn" data-tooltip="In this calculator, confidence is 1 − p-value. ${fmt(conf*100,2)}% means p = ${fmt(pVal,4)}; it is evidence against “no real effect”, not proof the variant is better." onclick="openConcept('confidence')">?</button></span>
           <span class="cc-val cc-val--result" style="color:${confColor}">${fmt(conf*100,2)}%</span>
         </div>
         <div class="cc-step cc-result">

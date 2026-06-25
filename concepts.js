@@ -2,14 +2,12 @@
 const CONCEPTS = {
   confidence: {
     label: 'Confidence Level',
-    tooltip: 'How sure are we this result is not just luck? Higher = more trustworthy.',
+    tooltip: 'In this calculator: confidence = 1 − p-value. Higher confidence means lower Type-I error risk, not a magic guarantee.',
     deep: `
-      <p>Confidence level answers: <em>"If this variant truly had zero effect, how often would
-      random chance alone produce a result at least this extreme?"</em></p>
-      <p>At <strong>95% confidence</strong>, the answer is: only 5% of the time. That means
-      you'd expect a false positive once every 20 tests — even when nothing is really going on.</p>
-      <p>It is <strong>not</strong> the probability the variant is better. It is the probability
-      that the observed difference is not explained by noise alone.</p>
+      <p>You want to make sure the result of your A/B test is not just coincidence, luck or plain noise.</p>
+      <p>In this calculator, confidence is reported as <code>confidence = 1 − p-value</code>. So a p-value of 0.05 is shown as 95% confidence.</p>
+      <p>Strictly speaking, confidence levels and p-values are distinct statistical concepts. But this representation is common in A/B testing tools because it is intuitive for non-specialists — and yes, that is what this calculator reports.</p>
+      <p>Higher confidence means a lower chance of a <strong>Type-I error</strong>: a false positive where the test suggests an effect exists while, in reality, no effect exists.</p>
       <h4>Common thresholds</h4>
       <ul>
         <li><strong>90%</strong> — exploratory tests, low-stakes decisions</li>
@@ -20,13 +18,13 @@ const CONCEPTS = {
   },
   pvalue: {
     label: 'p-value',
-    tooltip: 'Probability that pure luck produced this result. Lower = more confident.',
+    tooltip: 'How compatible your observed data is with “no real effect”. Lower p-value means stronger evidence against the null hypothesis.',
     deep: `
-      <p>The p-value is the probability of seeing a difference <em>at least as extreme</em>
-      as yours, assuming the null hypothesis is true (i.e., the variant has zero effect).</p>
-      <p><strong>p = 0.04</strong> means: if there were truly no difference, random sampling
-      would produce a gap this large only 4% of the time.</p>
-      <p>Relationship to confidence: <code>confidence = 1 − p</code>. So p = 0.05 → 95% confidence.</p>
+      <p>The p-value estimates how compatible your observed data is with the assumption that there is no real effect.</p>
+      <p>In other words: if the null hypothesis were true, how surprising would a difference this large be?</p>
+      <p><strong>p = 0.04</strong> means: if there were truly no difference, random sampling would produce a gap this large only 4% of the time.</p>
+      <p>The significance level is the threshold; the p-value is the result. The p-value must be below your significance level before you reject the null hypothesis.</p>
+      <p>Relationship in this calculator: <code>confidence = 1 − p</code>. So p = 0.05 becomes 95% confidence.</p>
       <h4>Common misconceptions</h4>
       <ul>
         <li>p-value is <strong>not</strong> the probability the variant is better.</li>
@@ -37,27 +35,21 @@ const CONCEPTS = {
   },
   nullhypothesis: {
     label: 'Null Hypothesis (H₀)',
-    tooltip: 'The skeptic\'s claim: there is no real difference, any gap is random noise.',
+    tooltip: 'The bookkeeping baseline: the test has no real effect on conversion rate.',
     deep: `
-      <p>The null hypothesis (H₀) is the baseline assumption you are trying to disprove:
-      <em>"Control and variant perform identically. Any observed difference is random sampling noise."</em></p>
-      <p>Statistics does not prove H₀ is wrong — it measures how unlikely your data would be
-      <em>if</em> H₀ were true. When that probability drops below your threshold (e.g. 5%),
-      you <strong>reject</strong> H₀ and accept that something real is going on.</p>
-      <p>Failing to reject H₀ does not prove the variant has no effect. It only means your
-      data isn't strong enough to rule out chance yet — you may simply need more visitors.</p>
+      <p>The null hypothesis says: <em>"The test will have no effect on the conversion rate."</em></p>
+      <p>Your goal is to find enough evidence to reject it. Statistics does not prove the null hypothesis wrong with absolute certainty; it measures how unlikely your data would be if the null hypothesis were true.</p>
+      <p>Failing to reject it does not prove the variant has no effect. It only means your data is not strong enough to rule out chance yet — maybe the effect is small, maybe you need more visitors, maybe nothing is going on.</p>
     `
   },
   althypothesis: {
-    label: 'Alternative Hypothesis (H₁)',
-    tooltip: 'The optimist\'s claim: the variant is genuinely different from control.',
+    label: 'Test Type / Alternative Hypothesis',
+    tooltip: 'One-tailed checks one direction. Two-tailed checks both increase and decrease.',
     deep: `
-      <p>The alternative hypothesis (H₁) is what you hope to demonstrate:
-      <em>"The variant produces a different conversion rate than control."</em></p>
-      <p>In a <strong>two-tailed</strong> test, H₁ covers both directions (variant could be
-      better or worse). In a <strong>one-tailed</strong> test, H₁ only covers one direction
-      (e.g., variant is strictly better). One-tailed tests reach significance faster but are
-      only valid when you have a strong prior that the effect can't go the other way.</p>
+      <p>The alternative hypothesis says: <em>"The test will have an effect on the conversion rate."</em></p>
+      <p>A test can have two effects: the conversion rate can increase or decrease. A <strong>two-tailed</strong> test assumes both directions are possible.</p>
+      <p>A <strong>one-tailed</strong> test assumes only one direction is possible. It needs less data and reaches confidence faster, but there is a catch: if the effect goes the other way, you will not see it because it is not part of the calculation.</p>
+      <p>Use one-tailed only when you can honestly commit to one direction before the test starts.</p>
     `
   },
   zscore: {
@@ -77,9 +69,9 @@ const CONCEPTS = {
   },
   uplift: {
     label: 'Uplift / Lift',
-    tooltip: 'Relative improvement of variant vs control. +10% uplift ≠ +10 percentage points.',
+    tooltip: 'Expected or observed relative change in conversion rate. +10% uplift is not +10 percentage points.',
     deep: `
-      <p>Uplift (also called lift) is the <em>relative</em> change in conversion rate:</p>
+      <p>Uplift is the expected or observed change in conversion rate. This calculator reports it as a <strong>relative</strong> change:</p>
       <p><code>uplift = (variant rate − control rate) / control rate</code></p>
       <p>Example: control converts at 5%, variant at 5.5%.<br>
       Absolute difference = 0.5 pp. Relative uplift = +10%.</p>
@@ -91,14 +83,12 @@ const CONCEPTS = {
   },
   power: {
     label: 'Statistical Power',
-    tooltip: 'If a real effect exists, how likely is your test to detect it? 80% is standard.',
+    tooltip: 'If a real effect exists, how likely is your test to detect it? Higher power means fewer false negatives.',
     deep: `
-      <p>Statistical power is the probability that your test will correctly detect a true
-      effect when one exists. Power = 1 − β, where β is the type-II error rate (false negative).</p>
-      <p><strong>80% power</strong> means: if the variant truly wins by the assumed margin,
-      you will detect it 80% of the time. You will miss it 20% of the time.</p>
-      <p>Power affects required sample size: higher power → more visitors needed. This calculator
-      uses your power setting when projecting how many days a test needs to run.</p>
+      <p>Power answers this question: assuming there is a real effect, how likely is this test to detect it?</p>
+      <p>It is almost the opposite side of confidence. Confidence is about avoiding a <strong>Type-I error</strong> or false positive. Power is about avoiding a <strong>Type-II error</strong> or false negative.</p>
+      <p><code>Power = 1 − β</code>, where β is the Type-II error rate. At <strong>80% power</strong>, you still miss the assumed real effect 20% of the time.</p>
+      <p>Power is not part of the p-value calculation for the observed result. It helps you estimate before the test starts how many visitors are needed to reliably detect an effect.</p>
       <h4>Power depends on</h4>
       <ul>
         <li>The true effect size (bigger effect → easier to detect)</li>
@@ -109,17 +99,13 @@ const CONCEPTS = {
   },
   bonferroni: {
     label: 'Bonferroni Correction',
-    tooltip: 'Multiple variants inflate false-positive risk. Bonferroni divides α by variant count.',
+    tooltip: 'More variants mean more chances to find a lucky winner. Bonferroni divides α by the number of comparisons.',
     deep: `
-      <p>When you run multiple comparisons (e.g., Control vs A, Control vs B, Control vs C),
-      the chance of getting <em>at least one</em> false positive grows with each comparison.</p>
-      <p>With 3 variants and α = 0.05 each, the family-wise error rate is approximately
-      1 − (0.95)³ ≈ <strong>14.3%</strong> — nearly 3× your intended risk.</p>
-      <p>The <strong>Bonferroni correction</strong> divides α by the number of comparisons,
-      so each individual test uses a stricter threshold:</p>
+      <p>If you compare multiple variants against one control group, the chance of seeing at least one seemingly significant result purely by chance increases. I mean, there are so many colors.</p>
+      <p>The <strong>Bonferroni correction</strong> reduces that Type-I error risk by dividing the significance level α by the number of comparisons:</p>
       <p><code>α_adjusted = α / number_of_variants</code></p>
-      <p>It is conservative (can miss real effects) but straightforward and well-understood.
-      When you have only one variant, no correction is applied.</p>
+      <p>The adjusted significance level is then used instead of the original one when evaluating each variant. That raises the confidence threshold for everyone.</p>
+      <p>It is conservative and can miss real effects, but it is straightforward and easy to explain. When you have only one variant, no correction is applied.</p>
     `
   }
 };

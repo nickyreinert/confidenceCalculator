@@ -563,6 +563,7 @@ header p {
 }
 .alert-warn{background:rgba(199,154,79,0.12);color:var(--warning-500)}
 .alert-info{background:rgba(79,120,214,0.10);color:var(--accent)}
+.sidebar-help-note{margin-top:var(--space-3)}
 
 /* ── Result card (sits in .result-card-slot inside each .group-col) ── */
 .result-card {
