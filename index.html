@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CONFIDENCE — A/B Test Calculator</title>
 <link rel="stylesheet" href="style.css">
+<script>
+(function(){const t=new URLSearchParams(location.search).get('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -16,6 +19,22 @@
       <p>by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
     </div>
     <div class="header-actions">
+      <label class="calc-toggle" aria-label="Show calculation details" title="Show / hide calculation details">
+        <input type="checkbox" id="calcToggle" checked onchange="toggleCollapse(this.checked)">
+        <span class="calc-toggle-track">
+          <span class="calc-toggle-thumb"></span>
+        </span>
+        <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6l6 7-6 7h12"/></svg>
+        <span class="calc-toggle-label">Calc</span>
+      </label>
+      <label class="calc-toggle" aria-label="Show projection charts" title="Show / hide projection charts">
+        <input type="checkbox" id="projToggle" checked onchange="toggleProjection(this.checked)">
+        <span class="calc-toggle-track">
+          <span class="calc-toggle-thumb"></span>
+        </span>
+        <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.636-7 10-7 10 7 10 7-3.636 7-10 7S2 12 2 12z"/></svg>
+        <span class="calc-toggle-label">Projection</span>
+      </label>
       <button class="share-btn" onclick="shareState()" aria-label="Share">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Share
@@ -34,7 +53,7 @@
       <div class="fg traffic-total">
         <label>Overall Visitors</label>
         <div class="traffic-row">
-          <input type="number" id="sTotalVis" value="10000" min="1" oninput="onTotalVisChange()">
+          <input type="number" id="sTotalVis" value="10000" min="1" class="input--key" oninput="onTotalVisChange()">
           <button class="gs-even-btn" onclick="distributeEvenly()" aria-label="Distribute evenly">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/>
@@ -56,11 +75,11 @@
         </div>
         <div class="fg">
           <label>Visitors</label>
-          <input type="number" id="ctrl-n" value="5000" min="1" oninput="onVisitorsChange('ctrl')">
+          <input type="number" id="ctrl-n" value="5000" min="1" class="input--key" oninput="onVisitorsChange('ctrl')">
         </div>
         <div class="fg">
           <label>Conversions</label>
-          <input type="number" id="ctrl-c" value="250" min="0" oninput="recalc()">
+          <input type="number" id="ctrl-c" value="250" min="0" class="input--key" oninput="recalc()">
         </div>
         <div class="fg">
           <label>Rate</label>
@@ -85,33 +104,28 @@
         </div>
       </div>
       <div class="radio-group">
-        <span class="radio-label">Power <button class="help-btn" data-tooltip="Planning only: how many visitors you need to detect the effect. Higher power = need more visitors. Does not affect observed results." onclick="openConcept('power')">?</button></span>
-        <div class="radio-pills" id="powerRadios">
-          <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
-          <label class="radio-pill"><input type="radio" name="sPower" value="0.90" onchange="recalc()"><span>90%</span></label>
-        </div>
-      </div>
-      <div class="radio-group">
         <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed tests any direction; one-tailed only detects improvement." onclick="openConcept('althypothesis')">?</button></span>
         <div class="radio-pills" id="typeRadios">
           <label class="radio-pill"><input type="radio" name="sType" value="2" checked onchange="recalc()"><span>Two-tailed</span></label>
           <label class="radio-pill"><input type="radio" name="sType" value="1" onchange="recalc()"><span>One-tailed</span></label>
         </div>
       </div>
+      
+      <!-- Projection inputs -->
+      <div id="projectionSidebarLabel" class="sidebar-section-label">Projection</div>
+      <div class="radio-group" id="powerRadioGroup">
+        <span class="radio-label">Power <button class="help-btn" data-tooltip="Planning only: how many visitors you need to detect the effect. Higher power = need more visitors. Does not affect observed results." onclick="openConcept('power')">?</button></span>
+        <div class="radio-pills" id="powerRadios">
+          <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
+          <label class="radio-pill"><input type="radio" name="sPower" value="0.90" onchange="recalc()"><span>90%</span></label>
+        </div>
+      </div>
     </div>
-
-    <!-- Projection inputs -->
-    <div class="sidebar-section-label">Projection</div>
-    <div class="sidebar-projection">
+    <div id="projectionSidebar" class="sidebar-projection">
       <div class="fg">
         <label>Running since</label>
         <input type="number" id="scSince" value="1" min="1" step="1" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Units the test has been live</span>
-      </div>
-      <div class="fg">
-        <label>Visitors / time unit</label>
-        <input type="number" id="scVis" value="5000" min="1" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Per group (day / week / …)</span>
+        <span class="hint">Time units the test has been live</span>
       </div>
       <div class="fg">
         <label>Expected uplift (%) <button class="help-btn" data-tooltip="Your assumption about the effect size for planning. Higher uplift = need fewer visitors. Relative: +10% uplift ≠ +10 percentage points." onclick="openConcept('uplift')">?</button></label>
@@ -171,7 +185,7 @@
       </div>
 
       <!-- Power planning charts -->
-      <div class="proj-charts-row">
+      <div class="proj-charts-row" id="powerChartsRow">
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
@@ -209,7 +223,12 @@
 function toggleTheme() {
   const root = document.documentElement;
   root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  if (typeof buildStateParams === 'function') {
+    history.replaceState(null, '', '?' + buildStateParams().toString());
+  }
 }
+
+
 </script>
 </body>
 </html>

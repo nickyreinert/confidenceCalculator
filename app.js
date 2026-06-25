@@ -182,11 +182,11 @@ function addVariant() {
         </div>
         <div class="fg">
           <label>Visitors</label>
-          <input type="number" id="${id}-n" value="${visitorsEach}" min="1" oninput="onVisitorsChange('${id}')">
+          <input type="number" id="${id}-n" value="${visitorsEach}" min="1" class="input--key" oninput="onVisitorsChange('${id}')">
         </div>
         <div class="fg">
           <label>Conversions</label>
-          <input type="number" id="${id}-c" value="270" min="0" oninput="recalc()">
+          <input type="number" id="${id}-c" value="270" min="0" class="input--key" oninput="recalc()">
         </div>
         <div class="fg">
           <label>Rate</label>
@@ -318,7 +318,7 @@ function recalc() {
     slot.innerHTML = `
     <div class="result-card ${cardCls}">
       <div class="rc-head">
-        <span class="rc-title">${vr.label} vs Control</span>
+        <span class="rc-title">Result</span>
         <span class="badge ${badgeCls}">${badgeTxt}</span>
       </div>
 
@@ -384,13 +384,10 @@ function recalc() {
 
   const scUpl = document.getElementById('scUplift');
   if (!scUpl.dataset.manual && firstUplift !== null) scUpl.value = fmt(firstUplift*100, 1);
-  // Mirror total visitors to scenario visitor field
-  const scVis = document.getElementById('scVis');
-  if (!scVis.dataset.manual) scVis.value = Math.round(v('sTotalVis'));
 
   chartsDirty = true;
   renderCharts();
-  history.replaceState(null, '', '?' + buildStateParams().toString());
+  if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -413,7 +410,7 @@ function renderCharts() {
   if (!chartsDirty) return;
   chartsDirty = false;
 
-  const visPerUnit    = parseFloat(document.getElementById('scVis').value) || 1000;
+  const visPerUnit    = parseFloat(document.getElementById('sTotalVis').value) || 1000;
   const since         = parseInt(document.getElementById('scSince').value) || 1;
   const upliftRaw     = parseFloat(document.getElementById('scUplift').value);
   const expectedUplift = (upliftRaw || 0) / 100;
@@ -587,48 +584,68 @@ function renderCharts() {
     }
   });
 
+  const confCrossDataset = crossUnit ? [{
+    label: '_conf_cross',
+    data: [{ x: crossUnit, y: 0 }, { x: crossUnit, y: targetConf * 100 }],
+    borderColor: 'rgba(78,158,126,0.7)',
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderDash: [3, 3],
+    pointRadius: [0, 5],
+    pointBackgroundColor: '#4e9e7e',
+    pointBorderColor: 'transparent',
+    showLine: true, fill: false, tension: 0, order: 5,
+  }] : [];
+
   if (cConf) cConf.destroy();
   cConf = new Chart(document.getElementById('cConf'), {
     type: 'line',
     data: {
-      labels: units.map(u => u),
       datasets: [
         {
           label: `Confidence (${fmt(expectedUplift*100,1)}% uplift)`,
-          data: units.map(u => confAtUnit(u, visPerUnit, p1, p2, tails)),
+          data: units.map(u => ({ x: u, y: confAtUnit(u, visPerUnit, p1, p2, tails) })),
           borderColor: '#4f78d6',
           backgroundColor: 'rgba(79,120,214,0.08)',
-          fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2,
+          fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2, order: 10,
         },
         {
           label: `Target ${fmt(targetConf*100, targetConf*100 >= 99 ? 1 : 0)}%`,
-          data: units.map(() => targetConf * 100),
+          data: units.map(u => ({ x: u, y: targetConf * 100 })),
           borderColor: '#4e9e7e', borderWidth: 2, borderDash: [6, 4],
-          pointRadius: 0, fill: false,
+          pointRadius: 0, fill: false, order: 20,
         },
-        // vertical "now" line via a scatter point + annotation-free approach:
-        // represented as a single-point dataset
         {
           label: `Now (unit ${since})`,
-          data: units.map(u => u === since ? confAtSince : null),
+          data: [{ x: since, y: confAtSince }],
           borderColor: 'rgba(199,154,79,0.8)',
           backgroundColor: '#c79a4f',
-          pointRadius: units.map(u => u === since ? 6 : 0),
-          pointHoverRadius: 8,
-          showLine: false, fill: false,
-          type: 'scatter',
+          pointRadius: 6, pointHoverRadius: 8,
+          showLine: false, fill: false, order: 4,
         },
+        ...confCrossDataset,
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      parsing: false,
       plugins: {
-        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: { size: 11 } } },
+        legend: {
+          position: 'top',
+          labels: {
+            boxWidth: 12, padding: 14, font: { size: 11 },
+            filter: item => !item.text.startsWith('_'),
+          }
+        },
         tooltip: {
           callbacks: {
-            title: items => `Unit ${items[0].label}`,
-            label: c => c.raw !== null ? `${c.dataset.label}: ${typeof c.raw === 'number' ? c.raw.toFixed(2) + '%' : c.raw}` : null,
-          }
+            title: items => `Unit ${items[0].parsed.x}`,
+            label: c => {
+              if (c.dataset.label.startsWith('_')) return null;
+              return c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` : null;
+            },
+          },
+          filter: item => !item.dataset.label.startsWith('_'),
         }
       },
       scales: {
@@ -746,12 +763,12 @@ Chart.defaults.font.size = 10;
 Chart.defaults.color = '#6f7689';
 Chart.defaults.borderColor = '#d7dbe6';
 
-['scUplift', 'scVis', 'scSince'].forEach(id => {
+['scUplift', 'scSince'].forEach(id => {
   document.getElementById(id).addEventListener('input', function(){
     this.dataset.manual = '1';
     chartsDirty = true;
     renderCharts();
-    history.replaceState(null, '', '?' + buildStateParams().toString());
+    if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
   });
 });
 
@@ -769,8 +786,10 @@ function buildStateParams() {
   p.set('cn',    document.getElementById('ctrl-n').value);
   p.set('cc',    document.getElementById('ctrl-c').value);
   p.set('since', document.getElementById('scSince').value);
-  p.set('scvis', document.getElementById('scVis').value);
   p.set('scupl', document.getElementById('scUplift').value);
+  p.set('theme', document.documentElement.getAttribute('data-theme') || 'light');
+  p.set('calc',  document.getElementById('calcToggle')?.checked ? '1' : '0');
+  p.set('proj',  document.getElementById('projToggle')?.checked ? '1' : '0');
   p.set('nv',    variants.length);
   variants.forEach((vr, i) => {
     p.set(`vd${i}`, document.getElementById(vr.id + '-dist').value);
@@ -789,9 +808,13 @@ function shareState() {
   });
 }
 
+let _restoring = false;
+
 function restoreFromParams() {
   const p = new URLSearchParams(location.search);
   if (!p.has('vis')) return false;
+
+  _restoring = true;
 
   document.getElementById('sTotalVis').value = p.get('vis');
 
@@ -806,8 +829,18 @@ function restoreFromParams() {
   document.getElementById('ctrl-n').value = p.get('cn') || 5000;
   document.getElementById('ctrl-c').value = p.get('cc') || 250;
 
+  if (p.has('calc')) {
+    const showCalc = p.get('calc') !== '0';
+    const toggle = document.getElementById('calcToggle');
+    if (toggle) { toggle.checked = showCalc; toggleCollapse(showCalc, true); }
+  }
+  if (p.has('proj')) {
+    const showProj = p.get('proj') !== '0';
+    const toggle = document.getElementById('projToggle');
+    if (toggle) { toggle.checked = showProj; toggleProjection(showProj, true); }
+  }
+
   if (p.has('since')) { const el = document.getElementById('scSince'); el.value = p.get('since'); el.dataset.manual = '1'; }
-  if (p.has('scvis')) { const el = document.getElementById('scVis');   el.value = p.get('scvis'); el.dataset.manual = '1'; }
   if (p.has('scupl')) { const el = document.getElementById('scUplift');el.value = p.get('scupl'); el.dataset.manual = '1'; }
 
   const nv = parseInt(p.get('nv')) || 0;
@@ -821,6 +854,7 @@ function restoreFromParams() {
     document.getElementById(id + '-c').value = p.get(`vc${i}`) || 0;
   }
 
+  _restoring = false;
   recalc();
   return true;
 }
@@ -856,4 +890,21 @@ if (!restoreFromParams()) {
   addVariant();
   document.getElementById('v0-c').value = 280;
   recalc();
+}
+
+function toggleProjection(show, skipHistory) {
+  const hidden = !show;
+  document.getElementById('powerChartsRow')?.classList.toggle('proj-hidden', hidden);
+  document.getElementById('powerRadioGroup')?.classList.toggle('proj-hidden', hidden);
+  document.getElementById('projectionSidebarLabel')?.classList.toggle('proj-hidden', hidden);
+  document.getElementById('projectionSidebar')?.classList.toggle('proj-hidden', hidden);
+  if (!skipHistory && !_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
+}
+
+function toggleCollapse(showCalc, skipHistory) {
+  const grid = document.getElementById('groupsGrid');
+  grid.classList.toggle('calc-hidden', !showCalc);
+  if (!skipHistory) {
+    history.replaceState(null, '', '?' + buildStateParams().toString());
+  }
 }
