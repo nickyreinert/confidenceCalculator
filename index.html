@@ -109,9 +109,12 @@
     </div>
     <div id="projectionSidebar" class="sidebar-projection">
       <div class="fg">
-        <label>Running since</label>
-        <input type="number" id="scSince" value="1" min="1" step="1" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Time units the test has been live — days, weeks, whatever you use consistently</span>
+        <label for="scSince">Running since</label>
+        <div class="since-row">
+          <input type="number" id="scSince" value="1" min="1" step="1" oninput="chartsDirty=true;renderCharts()">
+          <input type="date" id="scSinceDate" aria-label="Test start date" title="Pick the start date — counts the days since then" onchange="onSinceDateChange()">
+        </div>
+        <span class="hint" id="scSinceHint">Time units the test has been live — days, weeks, whatever you use consistently. Or pick a start date to count days.</span>
       </div>
       <div class="fg">
         <label>Expected uplift (%) <button class="help-btn" data-tooltip="Your planning assumption about the effect size. It is relative: from 5% to 5.5% conversion is +10% uplift, not +10 percentage points." onclick="openConcept('uplift')">?</button></label>

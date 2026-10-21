@@ -788,11 +788,64 @@ Chart.defaults.borderColor = '#d7dbe6';
 ['scUplift', 'scSince'].forEach(id => {
   document.getElementById(id).addEventListener('input', function(){
     this.dataset.manual = '1';
+    // A hand-typed duration no longer matches the picked start date
+    if (id === 'scSince') clearSinceDate();
     chartsDirty = true;
     renderCharts();
     if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
   });
 });
+
+// ── Start date → "running since" in days ────────────────────────────────────
+
+const SINCE_HINT_DEFAULT = document.getElementById('scSinceHint').textContent;
+
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function parseLocalDate(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str || '');
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return isNaN(d) ? null : d;
+}
+
+// Whole calendar days from start to today, at least 1 (a test started today counts as day 1)
+function daysSince(str) {
+  const start = parseLocalDate(str);
+  if (!start) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(1, Math.round((today - start) / 86400000));
+}
+
+function applySinceDate() {
+  const dateEl = document.getElementById('scSinceDate');
+  const days = daysSince(dateEl.value);
+  const hint = document.getElementById('scSinceHint');
+  if (days === null) { hint.textContent = SINCE_HINT_DEFAULT; return false; }
+  const el = document.getElementById('scSince');
+  el.value = days;
+  el.dataset.manual = '1';
+  const label = parseLocalDate(dateEl.value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  hint.textContent = `${days} ${days === 1 ? 'day' : 'days'} since ${label} — time units are days`;
+  return true;
+}
+
+function clearSinceDate() {
+  document.getElementById('scSinceDate').value = '';
+  document.getElementById('scSinceHint').textContent = SINCE_HINT_DEFAULT;
+}
+
+function onSinceDateChange() {
+  applySinceDate();
+  chartsDirty = true;
+  renderCharts();
+  if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
+}
+
+document.getElementById('scSinceDate').max = localDateStr(new Date());
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARE / RESTORE STATE
@@ -808,6 +861,8 @@ function buildStateParams() {
   p.set('cn',    document.getElementById('ctrl-n').value);
   p.set('cc',    document.getElementById('ctrl-c').value);
   p.set('since', document.getElementById('scSince').value);
+  const start = document.getElementById('scSinceDate').value;
+  if (start) p.set('start', start);
   p.set('scupl', document.getElementById('scUplift').value);
   p.set('theme', document.documentElement.getAttribute('data-theme') || 'light');
   p.set('calc',  document.getElementById('calcToggle')?.dataset.state || 'full');
@@ -861,6 +916,11 @@ function restoreFromParams() {
   }
 
   if (p.has('since')) { const el = document.getElementById('scSince'); el.value = p.get('since'); el.dataset.manual = '1'; }
+  // A shared start date wins over the stored day count, so old links stay up to date
+  if (p.has('start')) {
+    document.getElementById('scSinceDate').value = p.get('start');
+    if (!applySinceDate()) clearSinceDate();
+  }
   if (p.has('scupl')) { const el = document.getElementById('scUplift');el.value = p.get('scupl'); el.dataset.manual = '1'; }
 
   const nv = parseInt(p.get('nv')) || 0;
