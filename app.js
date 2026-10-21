@@ -51,14 +51,6 @@ function pFromZ(z, tails) {
   return tails * (1 - normalCDF(Math.abs(z)));
 }
 
-function sampleSizePerGroup(baseRate, relLift, alpha, power) {
-  const p1 = baseRate, p2 = baseRate*(1+relLift);
-  const count = isCountMetric(p1, p2);
-  if (p1<=0||p2<=0||p1===p2||(!count&&(p1>=1||p2>=1))) return Infinity;
-  const za = invNorm(1-alpha/2), zb = invNorm(power);
-  return Math.ceil(Math.pow(za+zb,2)*(rateVariance(p1,count)+rateVariance(p2,count))/Math.pow(p2-p1,2));
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // VARIANT STATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,6 +392,7 @@ function recalc() {
 
   chartsDirty = true;
   renderCharts();
+  renderDeepDive();
   if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
@@ -409,15 +402,42 @@ function recalc() {
 
 let cConf = null, cVis = null, cPowerVis = null, cPowerTime = null;
 
-function confAtUnit(unit, visPerUnit, p1, p2, tails) {
+// Confidence (in %) for n1 / n2 visitors in control / variant, if the true rates are p1 / p2
+function confFromN(n1, n2, p1, p2, tails) {
   const count = isCountMetric(p1, p2);
-  if (p1 <= 0 || p2 <= 0 || (!count && p2 >= 1) || visPerUnit < 1) return 0;
-  const n = unit * visPerUnit;
-  const pp = (p1 + p2) / 2;
-  const se = Math.sqrt(rateVariance(pp, count) * (2 / n));
+  if (p1 <= 0 || p2 <= 0 || (!count && p2 >= 1) || !(n1 > 0) || !(n2 > 0)) return 0;
+  const pp = (p1 * n1 + p2 * n2) / (n1 + n2);
+  const se = Math.sqrt(rateVariance(pp, count) * (1 / n1 + 1 / n2));
   if (!(se > 0)) return 0;
   const z = (p2 - p1) / se;
   return Math.max(0, Math.min(100, (1 - pFromZ(z, tails)) * 100));
+}
+
+// Chance (in %) that a test with n1 / n2 visitors detects the assumed effect
+function powerFromN(n1, n2, p1, p2, alpha, tails) {
+  const count = isCountMetric(p1, p2);
+  if (p1 <= 0 || p2 <= 0 || p1 === p2 || (!count && p2 >= 1) || !(n1 > 0) || !(n2 > 0)) return null;
+  const se = Math.sqrt(rateVariance(p1, count) / n1 + rateVariance(p2, count) / n2);
+  if (!(se > 0)) return null;
+  return normalCDF(Math.abs(p2 - p1) / se - invNorm(1 - alpha / tails)) * 100;
+}
+
+// Smallest (fractional) time unit where a growing metric f reaches target, or null within cap
+function solveUnit(f, target, cap) {
+  const ok = u => (f(u) ?? -Infinity) >= target;
+  if (!ok(cap)) return null;
+  let lo = 0, hi = cap;
+  for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (ok(mid)) hi = mid; else lo = mid; }
+  return hi;
+}
+
+// At most ~400 x positions from 1 to end
+function unitGrid(end) {
+  const step = Math.max(1, Math.ceil(end / 400));
+  const out = [];
+  for (let u = 1; u < end; u += step) out.push(u);
+  out.push(end);
+  return out;
 }
 
 function renderCharts() {
@@ -425,8 +445,8 @@ function renderCharts() {
   if (!chartsDirty) return;
   chartsDirty = false;
 
-  const visPerUnit    = parseFloat(document.getElementById('sTotalVis').value) || 1000;
-  const since         = parseInt(document.getElementById('scSince').value) || 1;
+  const totalVis      = parseFloat(document.getElementById('sTotalVis').value) || 1000;
+  const since         = Math.max(1, parseInt(document.getElementById('scSince').value) || 1);
   const upliftRaw     = parseFloat(document.getElementById('scUplift').value);
   const expectedUplift = (upliftRaw || 0) / 100;
   const power         = parseFloat(document.querySelector('input[name="sPower"]:checked')?.value || '0.80');
@@ -438,34 +458,59 @@ function renderCharts() {
   const p1 = ctrlN > 0 ? ctrlC / ctrlN : 0;
   const p2 = p1 * (1 + expectedUplift);
 
-  // Project out far enough to show the target being crossed (max 500 units)
-  const MAX_UNITS = 500;
-  const confAtSince = confAtUnit(since, visPerUnit, p1, p2, tails);
-
-  // Find unit where confidence crosses target
-  let crossUnit = null;
-  for (let u = since; u <= MAX_UNITS; u++) {
-    if (confAtUnit(u, visPerUnit, p1, p2, tails) >= targetConf * 100) {
-      crossUnit = u;
-      break;
-    }
+  // Projections start from the visitors collected so far and continue at the traffic basis:
+  // recent daily traffic (deep dive data) or the average since the start.
+  // With several variants, the smallest one limits how fast evidence piles up.
+  const varNs = variants.map(vr => v(vr.id + '-n')).filter(n => n > 0);
+  const N1 = ctrlN, N2 = varNs.length ? Math.min(...varNs) : ctrlN;
+  const recent = deepRecentRates();
+  let f1, f2, fTotal, basisTxt;
+  if (recent) {
+    f1 = recent.rates[0];
+    f2 = Math.min(...recent.rates.slice(1));
+    fTotal = sum(recent.rates);
+    basisTxt = `${recent.all ? 'all' : 'last'} ${recent.days} ${recent.days === 1 ? 'day' : 'days'} · ${Math.round(fTotal).toLocaleString()} / day`;
+  } else {
+    f1 = N1 / since; f2 = N2 / since; fTotal = totalVis / since;
+    basisTxt = `average since start · ${Math.round(fTotal).toLocaleString()} / unit`;
   }
+  const nAt = u => (u <= since ? [u * N1 / since, u * N2 / since] : [N1 + (u - since) * f1, N2 + (u - since) * f2]);
+  const totalAt = u => (u <= since ? u * totalVis / since : totalVis + (u - since) * fTotal);
+  const confAt = u => confFromN(...nAt(u), p1, p2, tails);
+  const powerAt = u => powerFromN(...nAt(u), p1, p2, 1 - targetConf, tails);
 
-  const end = crossUnit ? Math.min(MAX_UNITS, Math.ceil(crossUnit * 1.25)) : MAX_UNITS;
-  const units = Array.from({length: end}, (_, i) => i + 1);
+  const hasEffect = p1 > 0 && expectedUplift !== 0;
+  const CAP = since + 100000;
+  const unitsFor = pw => (hasEffect ? solveUnit(powerAt, pw * 100, CAP) : null);
+  const reqUnitsExact = unitsFor(power);
+  const reqUnit = reqUnitsExact ? Math.max(1, Math.ceil(reqUnitsExact)) : null;
+
+  const confAtSince = confAt(since);
+  // Where confidence crosses the target (from the start, so a past crossing is reported too)
+  const crossExact = hasEffect ? solveUnit(confAt, targetConf * 100, CAP) : null;
+  const crossUnit = crossExact ? Math.max(1, Math.ceil(crossExact)) : null;
+
+  const horizon = Math.max(since * 4, 100);
+  const end = Math.min(Math.max(10, Math.ceil(Math.max(since, crossUnit ?? since * 2) * 1.25)), horizon);
+  const units = unitGrid(end);
 
   // Stat summary row
   const statEl = document.getElementById('scenStatRow');
-  if (p1 > 0 && expectedUplift !== 0) {
-    const crossTxt = crossUnit
-      ? `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit}</strong> (${crossUnit - since} more)`
-      : `does not reach <strong>${fmt(targetConf*100,0)}%</strong> within ${MAX_UNITS} time units`;
+  if (hasEffect) {
+    const crossTxt = !crossUnit
+      ? `does not reach <strong>${fmt(targetConf*100,0)}%</strong> at this traffic`
+      : crossUnit <= since
+        ? `<span class="pos">reached</span> <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit.toLocaleString()}</strong>`
+        : `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit.toLocaleString()}</strong> (${(crossUnit - since).toLocaleString()} more)`;
 
-    // Calculate required sample size per group for context
-    const reqSample = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, power);
-    const sampleDisplay = isFinite(reqSample)
-      ? `${Math.round(reqSample).toLocaleString()} visitors`
-      : '—';
+    // Visitors needed (overall, at the current split) until the target power is reached
+    let sampleDisplay = '—';
+    if (reqUnit) {
+      const when = reqUnit <= since
+        ? `<span class="pos">reached</span> at unit <strong>${reqUnit.toLocaleString()}</strong>`
+        : `at unit <strong>${reqUnit.toLocaleString()}</strong> (${(reqUnit - since).toLocaleString()} more)`;
+      sampleDisplay = `${Math.round(totalAt(reqUnitsExact)).toLocaleString()} visitors · ${when}`;
+    }
 
     statEl.innerHTML = `
       <div class="scen-stat">
@@ -477,12 +522,16 @@ function renderCharts() {
         <span class="scen-stat-val">${upliftRaw > 0 ? '+' : ''}${fmt(upliftRaw,1)}% → ${fmtPct(p2)}</span>
       </div>
       <div class="scen-stat">
+        <span class="scen-stat-label">Traffic basis</span>
+        <span class="scen-stat-val" title="Traffic per time unit used for everything after now">${basisTxt}</span>
+      </div>
+      <div class="scen-stat">
         <span class="scen-stat-label">Confidence now</span>
         <span class="scen-stat-val ${confAtSince >= targetConf*100 ? 'pos' : ''}">${fmt(confAtSince,2)}%</span>
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">Power ${fmt(power*100,0)}% needs</span>
-        <span class="scen-stat-val" title="Sample size per group at power level">${sampleDisplay}</span>
+        <span class="scen-stat-val" title="Overall visitors at the current split">${sampleDisplay}</span>
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">Projection</span>
@@ -493,30 +542,28 @@ function renderCharts() {
   }
 
   // ── Traffic sensitivity chart ──────────────────────────────────────────────
+  // "What if traffic had been X per unit from day one" at the current basis
   const visMultipliers = [0.25, 0.5, 1, 1.5, 2];
   const visColors      = ['#cf6b6b', '#c79a4f', '#4f78d6', '#7c3aed', '#4e9e7e'];
+  const confAtVolume = (u, m) => confFromN(u * f1 * m, u * f2 * m, p1, p2, tails);
 
   // Pre-compute crossing unit for each volume
   const visCrossings = visMultipliers.map(m => {
-    const vol = Math.round(visPerUnit * m);
-    if (p1 <= 0 || expectedUplift === 0) return null;
-    for (let u = 1; u <= MAX_UNITS; u++) {
-      if (confAtUnit(u, vol, p1, p2, tails) >= targetConf * 100) return u;
-    }
-    return null;
+    if (!hasEffect) return null;
+    const x = solveUnit(u => confAtVolume(u, m), targetConf * 100, CAP);
+    return x ? Math.max(1, Math.ceil(x)) : null;
   });
 
   // X range: far enough that the slowest crossing is visible with padding
   const maxCross = visCrossings.reduce((mx, c) => c ? Math.max(mx, c) : mx, crossUnit || 30);
-  const endVis = Math.min(MAX_UNITS, Math.ceil(maxCross * 1.3));
-  const visUnits = Array.from({length: endVis}, (_, i) => i + 1);
+  const endVis = Math.min(Math.max(10, Math.ceil(maxCross * 1.3)), horizon);
+  const visUnits = unitGrid(endVis);
 
   // Curve datasets
   const curveDatasets = visMultipliers.map((m, i) => {
-    const vol = Math.round(visPerUnit * m);
     return {
-      label: `${vol.toLocaleString()} / unit`,
-      data: visUnits.map(u => p1 > 0 && expectedUplift !== 0 ? confAtUnit(u, vol, p1, p2, tails) : null),
+      label: `${Math.round(fTotal * m).toLocaleString()} / unit`,
+      data: visUnits.map(u => hasEffect ? confAtVolume(u, m) : null),
       borderColor: visColors[i],
       backgroundColor: 'transparent',
       tension: 0.4, pointRadius: 0,
@@ -574,7 +621,7 @@ function renderCharts() {
         },
         tooltip: {
           callbacks: {
-            title: items => `Unit ${items[0].parsed.x}`,
+            title: items => (items.length ? `Unit ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
             label: c => {
               if (c.dataset.label.startsWith('_')) return null;
               return c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(1)}%` : null;
@@ -619,7 +666,7 @@ function renderCharts() {
       datasets: [
         {
           label: `Confidence (${fmt(expectedUplift*100,1)}% uplift)`,
-          data: units.map(u => ({ x: u, y: confAtUnit(u, visPerUnit, p1, p2, tails) })),
+          data: units.map(u => ({ x: u, y: confAt(u) })),
           borderColor: '#4f78d6',
           backgroundColor: 'rgba(79,120,214,0.08)',
           fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2, order: 10,
@@ -654,7 +701,7 @@ function renderCharts() {
         },
         tooltip: {
           callbacks: {
-            title: items => `Unit ${items[0].parsed.x}`,
+            title: items => (items.length ? `Unit ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
             label: c => {
               if (c.dataset.label.startsWith('_')) return null;
               return c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` : null;
@@ -683,11 +730,9 @@ function renderCharts() {
   const powerLevels = [0.70, 0.75, 0.80, 0.85, 0.90, 0.95];
   const powerLabels = powerLevels.map(p => `${fmt(p*100,0)}%`);
 
-  // Chart 3: Visitors needed at each power level
-  const visitorsByPower = powerLevels.map(p => {
-    const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
-    return isFinite(n) ? n : null;
-  });
+  // Chart 3: Overall visitors needed at each power level (at the current split)
+  const unitsByPower = powerLevels.map(p => unitsFor(p));
+  const visitorsByPower = unitsByPower.map(u => (u ? totalAt(u) : null));
 
   if (cPowerVis) cPowerVis.destroy();
   cPowerVis = new Chart(document.getElementById('cPowerVis'), {
@@ -695,7 +740,7 @@ function renderCharts() {
     data: {
       labels: powerLabels,
       datasets: [{
-        label: 'Visitors per group',
+        label: 'Visitors needed',
         data: visitorsByPower,
         borderColor: '#4f78d6',
         backgroundColor: 'rgba(79,120,214,0.2)',
@@ -708,13 +753,15 @@ function renderCharts() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: c => c.raw !== null ? `${Math.round(c.raw).toLocaleString()} visitors` : null
+            label: c => c.raw !== null
+              ? `${Math.round(c.raw).toLocaleString()} visitors (unit ${Math.max(1, Math.ceil(unitsByPower[c.dataIndex])).toLocaleString()})`
+              : null
           }
         }
       },
       scales: {
         y: {
-          title: { display: true, text: 'Visitors per group', font: { size: 11 } },
+          title: { display: true, text: 'Visitors (overall)', font: { size: 11 } },
           ticks: { font: { size: 10 }, callback: v => Math.round(v).toLocaleString() }
         },
         x: {
@@ -725,54 +772,83 @@ function renderCharts() {
     }
   });
 
-  // Chart 4: Time to reach sample size — time units on x, power level on y
-  const timeByPower = powerLevels
-    .map(p => {
-      const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
-      return isFinite(n) ? { x: Math.ceil(n / visPerUnit), y: p * 100 } : null;
-    })
-    .filter(Boolean);
+  // Chart 4: Power over time — continuous curve up to (and past) now
+  const reach95 = unitsFor(0.95);
+  const endP = Math.min(Math.max(10, Math.ceil(Math.max(since, reach95 ?? since * 2, reqUnit ?? 0) * 1.2)), horizon);
+  const powerCurve = hasEffect ? unitGrid(endP).map(u => ({ x: u, y: powerAt(u) })) : [];
+
+  const powerCrossDataset = reqUnit ? [{
+    label: '_power_cross',
+    data: [{ x: reqUnit, y: 0 }, { x: reqUnit, y: power * 100 }],
+    borderColor: 'rgba(78,158,126,0.7)',
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderDash: [3, 3],
+    pointRadius: [0, 5],
+    pointBackgroundColor: '#4e9e7e',
+    pointBorderColor: 'transparent',
+    showLine: true, fill: false, tension: 0, order: 5,
+  }] : [];
 
   if (cPowerTime) cPowerTime.destroy();
   cPowerTime = new Chart(document.getElementById('cPowerTime'), {
     type: 'line',
     data: {
       datasets: [{
-        label: 'Power reached',
-        data: timeByPower,
+        label: 'Power',
+        data: powerCurve,
         borderColor: '#7c3aed',
         backgroundColor: 'rgba(124,58,237,0.1)',
-        fill: 'start',
+        fill: 'origin',
         tension: 0.3,
-        pointRadius: 5,
-        pointBackgroundColor: '#7c3aed',
+        pointRadius: 0,
         borderWidth: 2,
-        clip: false,
-      }]
+        order: 10,
+      }, {
+        label: `Target ${fmt(power * 100, 0)}%`,
+        data: [{ x: 1, y: power * 100 }, { x: endP, y: power * 100 }],
+        borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4],
+        pointRadius: 0, fill: false, order: 20,
+      }, {
+        label: `Now (unit ${since})`,
+        data: [{ x: since, y: 0 }, { x: since, y: 100 }],
+        borderColor: '#c79a4f',
+        backgroundColor: '#c79a4f',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        fill: false,
+        order: 4,
+      }, ...powerCrossDataset]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      parsing: false,
       layout: { padding: { top: 8, right: 8 } },
       plugins: {
-        legend: { display: false },
+        legend: {
+          position: 'top',
+          labels: { boxWidth: 12, padding: 14, font: { size: 11 }, filter: item => !item.text.startsWith('_') }
+        },
         tooltip: {
+          filter: item => item.datasetIndex === 0,
           callbacks: {
-            title: items => `${items[0].raw.x.toLocaleString()} time units`,
-            label: c => `${fmt(c.raw.y,0)}% power`
+            title: items => (items.length ? `Unit ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
+            label: c => `${fmt(c.parsed.y, 1)}% power`
           }
         }
       },
       scales: {
         x: {
           type: 'linear',
-          beginAtZero: true,
-          title: { display: true, text: 'Time units', font: { size: 11 } },
-          ticks: { font: { size: 10 }, precision: 0, callback: v => Math.round(v).toLocaleString() }
+          min: 1, max: endP,
+          title: { display: true, text: 'Time units since test start', font: { size: 11 } },
+          ticks: { maxTicksLimit: 12, font: { size: 10 }, precision: 0, callback: v => Math.round(v).toLocaleString() }
         },
         y: {
-          min: 70, max: 95,
-          title: { display: true, text: 'Power level', font: { size: 11 } },
-          ticks: { font: { size: 10 }, stepSize: 5, callback: v => `${v}%` }
+          min: 0, max: 100,
+          title: { display: true, text: 'Power (%)', font: { size: 11 } },
+          ticks: { font: { size: 10 }, stepSize: 20, callback: v => `${v}%` }
         }
       }
     }
@@ -788,8 +864,8 @@ Chart.defaults.borderColor = '#d7dbe6';
 ['scUplift', 'scSince'].forEach(id => {
   document.getElementById(id).addEventListener('input', function(){
     this.dataset.manual = '1';
-    // A hand-typed duration no longer matches the picked start date
-    if (id === 'scSince') clearSinceDate();
+    // Keep the start date in step with the typed duration (in days)
+    if (id === 'scSince') syncDateFromSince();
     chartsDirty = true;
     renderCharts();
     if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
@@ -820,17 +896,30 @@ function daysSince(str) {
   return Math.max(1, Math.round((today - start) / 86400000));
 }
 
+function setSinceHint(days, dateStr) {
+  const label = parseLocalDate(dateStr).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  document.getElementById('scSinceHint').textContent = `${days} ${days === 1 ? 'day' : 'days'} since ${label} — time units are days`;
+}
+
 function applySinceDate() {
   const dateEl = document.getElementById('scSinceDate');
   const days = daysSince(dateEl.value);
-  const hint = document.getElementById('scSinceHint');
-  if (days === null) { hint.textContent = SINCE_HINT_DEFAULT; return false; }
+  if (days === null) { document.getElementById('scSinceHint').textContent = SINCE_HINT_DEFAULT; return false; }
   const el = document.getElementById('scSince');
   el.value = days;
   el.dataset.manual = '1';
-  const label = parseLocalDate(dateEl.value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  hint.textContent = `${days} ${days === 1 ? 'day' : 'days'} since ${label} — time units are days`;
+  setSinceHint(days, dateEl.value);
   return true;
+}
+
+// Number → date: start date = today minus the typed number of days
+function syncDateFromSince() {
+  const days = parseInt(document.getElementById('scSince').value);
+  if (!(days >= 1)) { clearSinceDate(); return; }
+  const now = new Date();
+  const start = localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days));
+  document.getElementById('scSinceDate').value = start;
+  setSinceHint(days, start);
 }
 
 function clearSinceDate() {
@@ -868,12 +957,17 @@ function buildStateParams() {
   p.set('calc',  document.getElementById('calcToggle')?.dataset.state || 'full');
   p.set('proj',  document.getElementById('projToggle')?.checked ? '1' : '0');
   p.set('sb',    document.querySelector('.dashboard')?.classList.contains('sidebar-collapsed') ? '1' : '0');
+  p.set('dd',    deepEnabled() ? '1' : '0');
+  p.set('rw',    deepWindowRaw());
   p.set('nv',    variants.length);
   variants.forEach((vr, i) => {
     p.set(`vd${i}`, document.getElementById(vr.id + '-dist').value);
     p.set(`vn${i}`, document.getElementById(vr.id + '-n').value);
     p.set(`vc${i}`, document.getElementById(vr.id + '-c').value);
   });
+  // Daily data last: it's by far the longest part of the link
+  const dz = deepData ? deepEncoded : deepPending;
+  if (dz) p.set('dz', dz);
   return p;
 }
 
@@ -881,8 +975,11 @@ function shareState() {
   const url = location.origin + location.pathname + '?' + buildStateParams().toString();
   navigator.clipboard.writeText(url).then(() => {
     const t = document.getElementById('shareToast');
+    t.textContent = url.length > URL_WARN_CHARS
+      ? `Link copied — ${fmt(url.length / 1024, 1)} KB, some apps cut links this long`
+      : 'Link copied!';
     t.classList.add('share-toast--visible');
-    setTimeout(() => t.classList.remove('share-toast--visible'), 2200);
+    setTimeout(() => t.classList.remove('share-toast--visible'), url.length > URL_WARN_CHARS ? 4500 : 2200);
   });
 }
 
@@ -914,13 +1011,17 @@ function restoreFromParams() {
     const toggle = document.getElementById('projToggle');
     if (toggle) { toggle.checked = showProj; toggleProjection(showProj, true); }
   }
+  const rw = document.querySelector(`input[name="sWindow"][value="${p.get('rw')}"]`);
+  if (rw) rw.checked = true;
+  if (p.get('dd') === '1') {
+    document.getElementById('deepToggle').checked = true;
+    toggleDeepDive(true, true);
+  }
 
   if (p.has('since')) { const el = document.getElementById('scSince'); el.value = p.get('since'); el.dataset.manual = '1'; }
   // A shared start date wins over the stored day count, so old links stay up to date
-  if (p.has('start')) {
-    document.getElementById('scSinceDate').value = p.get('start');
-    if (!applySinceDate()) clearSinceDate();
-  }
+  if (p.has('start')) document.getElementById('scSinceDate').value = p.get('start');
+  if (!p.has('start') || !applySinceDate()) syncDateFromSince();
   if (p.has('scupl')) { const el = document.getElementById('scUplift');el.value = p.get('scupl'); el.dataset.manual = '1'; }
 
   const nv = parseInt(p.get('nv')) || 0;
@@ -937,8 +1038,27 @@ function restoreFromParams() {
   document.getElementById('ctrl-c').value = p.get('cc') || 250;
   document.getElementById('sTotalVis').value = p.get('vis');
 
+  // Daily data is compressed, so it arrives a moment later; keep it in the URL meanwhile
+  const dz = p.get('dz');
+  if (dz) deepPending = dz;
+
   _restoring = false;
   recalc();
+
+  if (dz) {
+    decodeDeepData(dz)
+      .then(data => {
+        setDeepData(data, dz);
+        chartsDirty = true;
+        renderCharts();
+        renderDeepDive();
+        history.replaceState(null, '', '?' + buildStateParams().toString());
+      })
+      .catch(() => {
+        deepPending = '';
+        document.getElementById('deepInfo').textContent = 'The daily data in this link could not be read.';
+      });
+  }
   return true;
 }
 
@@ -975,6 +1095,7 @@ function toggleProjection(show, skipHistory) {
   document.getElementById('projectionSidebarLabel')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('projectionSidebar')?.classList.toggle('proj-hidden', hidden);
   updateRail();
+  updateJumpNav();
   if (!skipHistory && !_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
@@ -1043,15 +1164,47 @@ function updateRail() {
       ['Uplift', isFinite(upl) ? `${upl > 0 ? '+' : ''}${upl}%` : '—'],
     );
   }
+  if (deepEnabled()) chips.push(['Basis', !deepData ? 'avg' : deepWindowRaw() === 'all' ? 'all' : `${deepWindowRaw()}d`]);
   document.getElementById('railChips').innerHTML = chips
     .map(([k, val]) => `<span class="rail-chip"><span class="rail-chip-k">${k}</span><span class="rail-chip-v">${val}</span></span>`)
     .join('');
 }
 
+// ── Sticky jump navigation ──────────────────────────────────────────────────
+
+function jumpTargets() {
+  return [...document.querySelectorAll('#jumpNav a')].map(a => ({ a, el: document.getElementById(a.getAttribute('href').slice(1)) }));
+}
+
+// Only list sections that are currently shown
+function updateJumpNav() {
+  jumpTargets().forEach(({ a, el }) => { a.hidden = !el || !!el.closest('.proj-hidden'); });
+  highlightJumpNav();
+}
+
+function highlightJumpNav() {
+  const navH = document.getElementById('jumpNav').offsetHeight;
+  const shown = jumpTargets().filter(t => !t.a.hidden);
+  const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+  let current = shown[0];
+  shown.forEach(t => { if (t.el.getBoundingClientRect().top <= navH + 80) current = t; });
+  if (atBottom && shown.length) current = shown[shown.length - 1];
+  shown.forEach(t => t.a.classList.toggle('is-active', t === current));
+}
+
+document.getElementById('jumpNav').addEventListener('click', e => {
+  const a = e.target.closest('a');
+  if (!a) return;
+  e.preventDefault();
+  document.getElementById(a.getAttribute('href').slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+window.addEventListener('scroll', highlightJumpNav, { passive: true });
+
 // Boot: restore from URL or render defaults
 if (!restoreFromParams()) {
   addVariant();
   document.getElementById('v0-c').value = 280;
+  syncDateFromSince();
   recalc();
 }
 positionCollapseHandle();

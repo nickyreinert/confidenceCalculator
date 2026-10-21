@@ -107,5 +107,32 @@ const CONCEPTS = {
       <p>The adjusted significance level is then used instead of the original one when evaluating each variant. That raises the confidence threshold for everyone.</p>
       <p>It is conservative and can miss real effects, but it is straightforward and easy to explain. When you have only one variant, no correction is applied.</p>
     `
+  },
+  splitStability: {
+    label: 'Split stability',
+    tooltip: 'Checks if every week got roughly the same split as your totals. A split that moves over time can make the totals mislead.',
+    deep: `
+      <p>Your totals have a split — say 50/50 or 10/90. The daily data shows if that split held up week by week.</p>
+      <p>Small ups and downs are normal. The check only warns when the changes are both too big to be chance <em>and</em> at least 2 percentage points.</p>
+      <h4>Why it matters</h4>
+      <p>Say control gets most visitors in a strong sales week and the variant gets most in a weak one. Then the variant looks worse — not because of the change you made, but because of <em>when</em> its visitors came.</p>
+      <h4>Common causes</h4>
+      <ul>
+        <li>The split was changed while the test was running</li>
+        <li>Tracking broke for one group on some days</li>
+        <li>Bots or a campaign landing in one group</li>
+      </ul>
+      <p>If the split changed, look at the traffic chart and judge the period with a steady split on its own.</p>
+    `
+  },
+  recentTraffic: {
+    label: 'Traffic basis',
+    tooltip: 'Projections need to know how many visitors are coming in now. Recent days say more about that than the average since the start.',
+    deep: `
+      <p>Projections answer "how long until…?" — so they need today's traffic, not last year's.</p>
+      <p>Without daily data, the calculator divides all visitors by the days the test has been running. That's fine when traffic is steady. When it isn't — say 390 quiet days and then 10 busy ones — the average is far too low and projections become far too pessimistic.</p>
+      <p>With daily data, you choose: the average of the last 7, 14 or 28 days, or of all pasted days. Today is left out while it's still running, because a half day would pull the average down.</p>
+      <p><strong>Tip:</strong> 14 days evens out weekday swings. Use 7 days if traffic just changed, 28 days if it's very bumpy. <em>All days</em> only fits when traffic has been steady the whole time.</p>
+    `
   }
 };

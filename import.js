@@ -68,31 +68,32 @@ function splitTable(text) {
 const isRowIndexCell = c => /^\d+\.$/.test(c.trim());
 const isTotalLabel   = l => /^(total|totals|gesamt|summe|sum)\b|^(target\s+)?(experiences|activities)$/i.test(l.trim());
 
-function analyzeImport(text) {
-  const table = splitTable(text);
-  const rows = table.map(cells => {
-    const nums = cells.map(c => (isRowIndexCell(c) ? null : parseNumberCell(c)));
-    const label = cells.find((c, i) => c && !nums[i] && !isRowIndexCell(c)) || '';
-    const counts = nums.filter(n => n && !n.isPct).length;
-    return { cells, nums, label, isData: !!label && counts >= 2 && !isTotalLabel(label) };
-  });
+// Dates as exported by Workspace, Excel or Sheets → 'YYYY-MM-DD' (or null).
+// Accepts 2026-10-20, 20.10.2026, 10/20/2026 (20/10/2026 if the first part > 12),
+// "Oct 20, 2026", "20 Oct 2026", "20. Okt. 2026", optionally prefixed with a weekday.
+const MONTHS = { jan:0, feb:1, mar:2, mär:2, maer:2, apr:3, may:4, mai:4, jun:5, jul:6, aug:7, sep:8, oct:9, okt:9, nov:10, dec:11, dez:11 };
 
-  const firstData = rows.findIndex(r => r.isData);
-  if (firstData < 0) return { rows: [], columns: [], error: 'No rows with an experience name and at least two numbers found.' };
-  let data = rows.filter(r => r.isData);
+function parseDateCell(raw) {
+  const s = String(raw ?? '').trim().replace(/^(mon|tue|wed|thu|fri|sat|sun|mo|di|mi|do|fr|sa|so)[a-zäöü]*\.?,?\s+/i, '');
+  let y, m, d, x;
+  if ((x = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/.exec(s))) [y, m, d] = [+x[1], +x[2] - 1, +x[3]];
+  else if ((x = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s))) [y, m, d] = [+x[3], +x[2] - 1, +x[1]];
+  else if ((x = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s))) {
+    const a = +x[1], b = +x[2];
+    [y, m, d] = a > 12 ? [+x[3], b - 1, a] : [+x[3], a - 1, b];
+  } else if ((x = /^([A-Za-zä]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(s))) {
+    m = MONTHS[x[1].slice(0, 3).toLowerCase()] ?? MONTHS[x[1].slice(0, 4).toLowerCase()]; [d, y] = [+x[2], +x[3]];
+  } else if ((x = /^(\d{1,2})\.?\s+([A-Za-zä]{3,9})\.?,?\s+(\d{4})$/.exec(s))) {
+    m = MONTHS[x[2].slice(0, 3).toLowerCase()] ?? MONTHS[x[2].slice(0, 4).toLowerCase()]; [d, y] = [+x[1], +x[3]];
+  } else return null;
+  if (m === undefined || y < 1990 || y > 2100) return null;
+  const dt = new Date(y, m, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m || dt.getDate() !== d) return null;
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
 
-  // Drop a totals row regardless of its label: its counts equal the sum of all other rows
-  if (data.length >= 3) {
-    const countIdx = data[0].nums.map((n, i) => (n && !n.isPct ? i : -1)).filter(i => i >= 0);
-    data = data.filter(r => !countIdx.every(i => {
-      const others = data.reduce((s, o) => s + (o !== r && o.nums[i] ? o.nums[i].value : 0), 0);
-      return Math.abs(others - (r.nums[i]?.value ?? NaN)) <= Math.max(1, others * 0.001);
-    }));
-  }
-
-  // Column names: combine all header rows above the first data row (Workspace stacks metric name + date range)
-  const width = Math.max(...rows.map(r => r.cells.length));
-  const headerRows = rows.slice(0, firstData).filter(r => !r.isData);
+// Column names: combine all header rows above the data (Workspace stacks metric name + date range)
+function countColumns(data, headerRows, width) {
   const columns = [];
   for (let i = 0; i < width; i++) {
     const isCount = data.every(r => r.nums[i] && !r.nums[i].isPct);
@@ -104,8 +105,10 @@ function analyzeImport(text) {
       .join(' · ');
     columns.push({ index: i, name: name || `Column ${i + 1}` });
   }
-  if (columns.length < 2) return { rows: [], columns: [], error: 'Need at least two count columns (visitors and conversions).' };
+  return columns;
+}
 
+function detectMapping(columns, labels) {
   const visScore = name =>
     /unique\s*visitors?|eindeutige\s*besucher/i.test(name) ? 4 :
     /visitors?|besucher/i.test(name) ? 3 :
@@ -124,15 +127,108 @@ function analyzeImport(text) {
     || others[0];
 
   const ctrlPattern = /control|kontroll|default|standard|original|baseline|^experience\s*a\b|^a$/i;
-  const ctrlIdx = Math.max(0, data.findIndex(r => ctrlPattern.test(r.label)));
+  const ctrlIdx = Math.max(0, labels.findIndex(l => ctrlPattern.test(l)));
+  return { visCol: visCol.index, convCol: convCol.index, ctrlIdx };
+}
+
+function parseImportRows(table) {
+  return table.map(cells => {
+    // A date cell is never a count, even if it looks like one ("20.10.2026")
+    const dateIdx = cells.findIndex(c => parseDateCell(c));
+    const date = dateIdx >= 0 ? parseDateCell(cells[dateIdx]) : null;
+    const nums = cells.map((c, i) => (i === dateIdx || isRowIndexCell(c) ? null : parseNumberCell(c)));
+    const label = cells.find((c, i) => c && i !== dateIdx && !nums[i] && !isRowIndexCell(c)) || '';
+    const counts = nums.filter(n => n && !n.isPct).length;
+    return { cells, nums, label, date, counts };
+  });
+}
+
+function analyzeImport(text) {
+  const table = splitTable(text);
+  const parsed = parseImportRows(table);
+  if (parsed.filter(r => r.date && r.counts >= 2).length >= 2) return analyzeDailyImport(parsed);
+
+  const rows = parsed.map(r => ({ ...r, isData: !!r.label && r.counts >= 2 && !isTotalLabel(r.label) }));
+
+  const firstData = rows.findIndex(r => r.isData);
+  if (firstData < 0) return { rows: [], columns: [], error: 'No rows with an experience name and at least two numbers found.' };
+  let data = rows.filter(r => r.isData);
+
+  // Drop a totals row regardless of its label: its counts equal the sum of all other rows
+  if (data.length >= 3) {
+    const countIdx = data[0].nums.map((n, i) => (n && !n.isPct ? i : -1)).filter(i => i >= 0);
+    data = data.filter(r => !countIdx.every(i => {
+      const others = data.reduce((s, o) => s + (o !== r && o.nums[i] ? o.nums[i].value : 0), 0);
+      return Math.abs(others - (r.nums[i]?.value ?? NaN)) <= Math.max(1, others * 0.001);
+    }));
+  }
+
+  const width = Math.max(...rows.map(r => r.cells.length));
+  const headerRows = rows.slice(0, firstData).filter(r => !r.isData);
+  const columns = countColumns(data, headerRows, width);
+  if (columns.length < 2) return { rows: [], columns: [], error: 'Need at least two count columns (visitors and conversions).' };
 
   return {
     rows: data.map(r => ({ label: r.label, nums: r.nums })),
     columns,
-    visCol: visCol.index,
-    convCol: convCol.index,
-    ctrlIdx,
+    ...detectMapping(columns, data.map(r => r.label)),
   };
+}
+
+// Daily layout: one row per group and day, e.g. Adobe Workspace with Experience → Day.
+// Total rows (no date, or "Day" in the date column) are used for the card totals,
+// because unique visitors can't be summed across days.
+function analyzeDailyImport(parsed) {
+  const dated = parsed.filter(r => r.date && r.label && r.counts >= 2 && !isTotalLabel(r.label));
+  if (!dated.length) {
+    return { rows: [], columns: [], error: 'Found dates, but no group names next to them. Use one row per day and group (e.g. Adobe Workspace: Experience → Day).' };
+  }
+
+  const width = Math.max(...parsed.map(r => r.cells.length));
+  const firstIdx = parsed.indexOf(dated[0]);
+  const headerRows = parsed.slice(0, firstIdx).filter(r => !r.date && r.counts < 2);
+  const columns = countColumns(dated, headerRows, width);
+  if (columns.length < 2) return { rows: [], columns: [], error: 'Need at least two count columns (visitors and conversions).' };
+
+  const labels = [...new Set(dated.map(r => r.label))];
+  const rows = labels.map(label => {
+    const total = parsed.find(r => !r.date && r.label === label && columns.every(c => r.nums[c.index] && !r.nums[c.index].isPct));
+    if (total) return { label, nums: total.nums, fromTotal: true };
+    const nums = Array(width).fill(null);
+    columns.forEach(c => {
+      nums[c.index] = { value: dated.filter(r => r.label === label).reduce((s, r) => s + r.nums[c.index].value, 0), isPct: false };
+    });
+    return { label, nums, fromTotal: false };
+  });
+
+  const dates = [...new Set(dated.map(r => r.date))].sort();
+  const spanDays = Math.round((new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000) + 1;
+  if (spanDays > 3660) return { rows: [], columns: [], error: 'Dates span more than 10 years — check the date column.' };
+
+  return {
+    rows,
+    columns,
+    ...detectMapping(columns, labels),
+    daily: { dated: dated.map(r => ({ label: r.label, date: r.date, nums: r.nums })), from: dates[0], to: dates[dates.length - 1], spanDays },
+  };
+}
+
+// Day-by-day arrays per group (control first, gaps filled with zeros)
+function buildDailyData(model, groupLabels) {
+  const { dated, from, spanDays } = model.daily;
+  const start = parseLocalDate(from);
+  const dates = Array.from({ length: spanDays }, (_, i) =>
+    localDateStr(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
+  const index = new Map(dates.map((d, i) => [d, i]));
+  const groups = groupLabels.map(label => ({ label, n: Array(spanDays).fill(0), c: Array(spanDays).fill(0) }));
+  dated.forEach(r => {
+    const g = groups.find(x => x.label === r.label);
+    const i = index.get(r.date);
+    if (!g || i === undefined) return;
+    g.n[i] += Math.round(r.nums[model.visCol]?.value || 0);
+    g.c[i] += Math.round(r.nums[model.convCol]?.value || 0);
+  });
+  return { dates, groups };
 }
 
 // ── Dialog ──────────────────────────────────────────────────────────────────
@@ -222,7 +318,12 @@ function renderImportPreview() {
   if (groups.length > IMPORT_MAX_GROUPS) msgs.push(`Only the first ${IMPORT_MAX_GROUPS - 1} variants are imported (max. 5).`);
   if (sameCol) msgs.push('Visitors and conversions use the same column.');
   status.className = 'import-status' + (sameCol ? ' import-status--err' : msgs.length ? ' import-status--warn' : ' import-status--ok');
-  status.textContent = msgs.length ? msgs.join(' ') : `${used.length} groups detected — check the mapping, then apply.`;
+  const daily = importModel.daily;
+  const dailyTxt = daily
+    ? ` Daily data: ${daily.spanDays} days (${fmtShortDate(daily.from)} – ${fmtShortDate(daily.to)}) — opens the Deep dive.`
+      + (importModel.rows.some(r => r.fromTotal) ? ' Card totals come from the total rows.' : '')
+    : '';
+  status.textContent = (msgs.length ? msgs.join(' ') : `${used.length} groups detected — check the mapping, then apply.`) + dailyTxt;
 
   const fmtInt = n => n.toLocaleString();
   preview.innerHTML = `
@@ -261,6 +362,17 @@ function applyImport() {
 
   // Let the projection pick up the observed uplift from the new data
   delete document.getElementById('scUplift').dataset.manual;
+
+  if (importModel.daily) {
+    setDeepData(buildDailyData(importModel, groups.map(g => g.label)));
+    document.getElementById('scSinceDate').value = importModel.daily.from;
+    applySinceDate();
+    document.getElementById('deepToggle').checked = true;
+    toggleDeepDive(true, true);
+  } else {
+    // Totals-only import: old daily data no longer matches the cards
+    setDeepData(null);
+  }
 
   _restoring = false;
   recalc();

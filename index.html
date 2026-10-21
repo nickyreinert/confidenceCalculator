@@ -38,6 +38,14 @@
         <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.636-7 10-7 10 7 10 7-3.636 7-10 7S2 12 2 12z"/></svg>
         <span class="calc-toggle-label">Projection</span>
       </label>
+      <label class="calc-toggle" aria-label="Show deep dive" title="Show / hide the deep dive: daily history, checks and breakdowns">
+        <input type="checkbox" id="deepToggle" onchange="toggleDeepDive(this.checked)">
+        <span class="calc-toggle-track">
+          <span class="calc-toggle-thumb"></span>
+        </span>
+        <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 13v-2M11 13V9M14 13v-3"/></svg>
+        <span class="calc-toggle-label">Deep dive</span>
+      </label>
       <button class="share-btn" onclick="openImport()" aria-label="Import data" title="Paste a table from Adobe Analytics / Target, CSV, Excel or Sheets (or just press Ctrl/⌘+V)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg>
         Import
@@ -46,11 +54,20 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Share
       </button>
+      <button class="theme-btn tour-btn" onclick="startTour()" aria-label="Quick tour" title="Quick tour — how this calculator works">?</button>
       <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
     </div>
     <div class="share-toast" id="shareToast">Link copied!</div>
   </div>
 </header>
+
+<nav class="jump-nav" id="jumpNav" aria-label="Jump to section">
+  <a href="#groupsGrid">Results</a>
+  <a href="#secProjection">Projection</a>
+  <a href="#powerChartsRow">Power</a>
+  <a href="#deepSection">Deep dive</a>
+  <a href="#deepBreakdowns">Breakdowns</a>
+</nav>
 
 <div class="dashboard">
 
@@ -125,6 +142,20 @@
         Plan the target before you stare at the result: confidence threshold, running time and visitors. Checking every day and stopping the second it looks good is p-hacking. <button class="help-btn" data-tooltip="Define the target first. Otherwise one lucky day can make noise look like a winner." onclick="openConcept('pvalue')">?</button>
       </div>
     </div>
+
+    <!-- Deep dive inputs -->
+    <div id="deepSidebarLabel" class="sidebar-section-label proj-hidden">Deep dive</div>
+    <div id="deepSidebar" class="sidebar-projection proj-hidden">
+      <div class="radio-group">
+        <span class="radio-label">Traffic basis <button class="help-btn" data-tooltip="With daily data, projections use the average traffic of the most recent days instead of the average since the start. Today is left out while it's still running." onclick="openConcept('recentTraffic')">?</button></span>
+        <div class="radio-pills" id="windowRadios">
+          <label class="radio-pill"><input type="radio" name="sWindow" value="7" onchange="recalc()"><span>Last 7 days</span></label>
+          <label class="radio-pill"><input type="radio" name="sWindow" value="14" checked onchange="recalc()"><span>14 days</span></label>
+          <label class="radio-pill"><input type="radio" name="sWindow" value="28" onchange="recalc()"><span>28 days</span></label>
+          <label class="radio-pill"><input type="radio" name="sWindow" value="all" onchange="recalc()"><span>All days</span></label>
+        </div>
+      </div>
+    </div>
   </aside>
 
   <!-- Collapse handle: outside the sidebar so it can straddle its edge -->
@@ -187,7 +218,7 @@
     </div>
 
     <!-- Projection section -->
-    <section class="section projection-section">
+    <section class="section projection-section" id="secProjection">
       <div class="scen-stat-row" id="scenStatRow"></div>
       <div class="proj-charts-row">
         <div class="chart-box">
@@ -232,16 +263,88 @@
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
-              <div class="scen-chart-title">Time to power target</div>
+              <div class="scen-chart-title">Power over time</div>
             </div>
             <button class="chart-copy-btn" onclick="copyChart('cPowerTime')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerTime"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct — when the test should have enough visitors</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct — how likely the test is to detect it after each time unit</div>
         </div>
       </div>
+    </section>
+
+    <!-- Deep dive: daily history + checks -->
+    <section class="section projection-section deep-section proj-hidden" id="deepSection">
+      <div class="deep-head">
+        <div class="chart-title-group">
+          <div class="chart-box-title">Deep dive</div>
+          <div class="scen-chart-sub" id="deepInfo"></div>
+        </div>
+        <div class="deep-actions">
+          <button type="button" class="btn-split" onclick="openImport()">Import daily data</button>
+          <button type="button" class="btn-split" id="deepClearBtn" onclick="setDeepData(null);recalc()">Clear</button>
+        </div>
+      </div>
+
+      <div class="deep-empty" id="deepEmpty">
+        <p><strong>Paste daily numbers to see how your test developed over time.</strong></p>
+        <p>One row per group and day — e.g. an Adobe Workspace table with <em>Experience → Day</em>, or a sheet with <code>Group · Date · Visitors · Conversions</code>. Totals rows are fine, they're used for the cards.</p>
+        <button type="button" class="import-btn import-btn--primary" onclick="openImport()">Import daily data</button>
+      </div>
+
+      <div id="deepBody">
+        <div class="deep-checks" id="deepChecks"></div>
+        <div class="proj-charts-row">
+          <div class="chart-box">
+            <div class="chart-box-header">
+              <div class="chart-title-group"><div class="scen-chart-title">Traffic per day</div></div>
+              <button class="chart-copy-btn" onclick="copyChart('cDeepTraffic')" aria-label="Copy chart image" title="Copy chart">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+              </button>
+            </div>
+            <div class="chart-wrap" style="height:280px"><canvas id="cDeepTraffic"></canvas></div>
+            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Visitors per day and group — spikes and gaps show up here first</div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-box-header">
+              <div class="chart-title-group"><div class="scen-chart-title">Actual confidence over time</div></div>
+              <button class="chart-copy-btn" onclick="copyChart('cDeepConf')" aria-label="Copy chart image" title="Copy chart">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+              </button>
+            </div>
+            <div class="chart-wrap" style="height:280px"><canvas id="cDeepConf"></canvas></div>
+            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Your real data, added up day by day. The line will cross the threshold by chance now and then — don't stop the test at the first crossing.</div>
+          </div>
+          <div class="chart-box chart-box--wide">
+            <div class="chart-box-header">
+              <div class="chart-title-group"><div class="scen-chart-title">Uplift over time</div></div>
+              <button class="chart-copy-btn" onclick="copyChart('cDeepUplift')" aria-label="Copy chart image" title="Copy chart">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+              </button>
+            </div>
+            <div class="chart-wrap" style="height:300px"><canvas id="cDeepUplift"></canvas></div>
+            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Line = uplift so far, shaded = likely range. Dots = uplift within each week — a downward trend means the effect is wearing off.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Breakdowns by weekday / day of month / month -->
+    <section class="section projection-section deep-section proj-hidden" id="deepBreakdowns">
+      <div class="deep-head">
+        <div class="chart-title-group">
+          <div class="chart-box-title">Breakdowns</div>
+          <div class="scen-chart-sub">Patterns, not winners: slice data often enough and some slices look like big wins or losses by pure chance. Use this to spot patterns — e.g. weekends behave differently — not to crown a winner per slice.</div>
+        </div>
+        <div class="radio-pills" role="tablist" id="breakdownTabs">
+          <label class="radio-pill"><input type="radio" name="sBreakdown" value="weekday" checked onchange="renderBreakdown()"><span>Weekday</span></label>
+          <label class="radio-pill"><input type="radio" name="sBreakdown" value="dom" onchange="renderBreakdown()"><span>Day of month</span></label>
+          <label class="radio-pill"><input type="radio" name="sBreakdown" value="month" onchange="renderBreakdown()"><span>Month</span></label>
+        </div>
+      </div>
+      <div class="bd-table-wrap" id="breakdownTable"></div>
     </section>
 
   </main>
@@ -253,7 +356,7 @@
     <div class="import-head">
       <div>
         <div class="import-title" id="importTitle">Import test data</div>
-        <div class="import-sub">Copy the table from Adobe Analysis Workspace (A4T panel or freeform table), a Target report CSV, Excel or Google Sheets, then paste it here. One row per experience. Nothing leaves your browser.</div>
+        <div class="import-sub">Copy the table from Adobe Analysis Workspace (A4T panel or freeform table), a Target report CSV, Excel or Google Sheets, then paste it here. One row per experience — or one row per experience and day for the Deep dive. Nothing leaves your browser.</div>
       </div>
       <button type="button" class="btn-remove import-close" onclick="closeImport()" aria-label="Close">✕</button>
     </div>
@@ -288,8 +391,10 @@
 
 <script src="concepts.js"></script>
 <script src="sidebar.js"></script>
+<script src="deepdive.js"></script>
 <script src="app.js"></script>
 <script src="import.js"></script>
+<script src="tour.js"></script>
 <script>
 function toggleTheme() {
   const root = document.documentElement;
