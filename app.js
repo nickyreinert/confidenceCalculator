@@ -28,12 +28,23 @@ function invNorm(p) {
   }
 }
 
+// Rates above 100% mean multiple conversions per visitor (count metric):
+// binomial variance p(1-p) is invalid there, so fall back to Poisson variance p.
+function isCountMetric(...rates) {
+  return rates.some(r => r > 1);
+}
+
+function rateVariance(p, count) {
+  return count ? p : p*(1-p);
+}
+
 function zTest(n1, c1, n2, c2) {
   const p1 = c1/n1, p2 = c2/n2;
   const pp = (c1+c2)/(n1+n2);
-  const se = Math.sqrt(pp*(1-pp)*(1/n1+1/n2));
-  if (se === 0) return { z:0, p1, p2, pp, se };
-  return { z:(p2-p1)/se, p1, p2, pp, se };
+  const count = isCountMetric(p1, p2);
+  const se = Math.sqrt(rateVariance(pp, count)*(1/n1+1/n2));
+  if (!(se > 0)) return { z:0, p1, p2, pp, se, count };
+  return { z:(p2-p1)/se, p1, p2, pp, se, count };
 }
 
 function pFromZ(z, tails) {
@@ -42,9 +53,10 @@ function pFromZ(z, tails) {
 
 function sampleSizePerGroup(baseRate, relLift, alpha, power) {
   const p1 = baseRate, p2 = baseRate*(1+relLift);
-  if (p2<=0||p2>=1||p1<=0||p1>=1) return Infinity;
+  const count = isCountMetric(p1, p2);
+  if (p1<=0||p2<=0||p1===p2||(!count&&(p1>=1||p2>=1))) return Infinity;
   const za = invNorm(1-alpha/2), zb = invNorm(power);
-  return Math.ceil(Math.pow(za+zb,2)*(p1*(1-p1)+p2*(1-p2))/Math.pow(p2-p1,2));
+  return Math.ceil(Math.pow(za+zb,2)*(rateVariance(p1,count)+rateVariance(p2,count))/Math.pow(p2-p1,2));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,7 +303,7 @@ function recalc() {
       return;
     }
 
-    const { z, pp, se } = zTest(n1, c1, n2, c2);
+    const { z, pp, se, count } = zTest(n1, c1, n2, c2);
     const pVal    = pFromZ(z, tails);
     const conf    = 1 - pVal;
     const uplift  = p1 > 0 ? (p2-p1)/p1 : 0;
@@ -319,6 +331,7 @@ function recalc() {
     <div class="result-card ${cardCls}">
       <div class="rc-head">
         <span class="rc-title">Result</span>
+        <span class="rc-compact" title="Confidence · relative uplift"><span style="color:${confColor}">${fmt(conf*100,2)}%</span><span class="${upCls}">${upSign}${fmt(uplift*100,2)}%</span></span>
         <span class="badge ${badgeCls}">${badgeTxt}</span>
       </div>
 
@@ -339,7 +352,7 @@ function recalc() {
           <span class="cc-val">${fmtPct(pp)}</span>
         </div>
         <div class="cc-step cc-mid">
-          <span class="cc-key">SE = √(p̄·(1−p̄)·(1/n₁+1/n₂))</span>
+          <span class="cc-key">${count ? 'SE = √(p̄·(1/n₁+1/n₂)) <small>(count metric, rate &gt; 100%)</small>' : 'SE = √(p̄·(1−p̄)·(1/n₁+1/n₂))'}</span>
           <span class="cc-val">${fmt(se,6)}</span>
         </div>
 
@@ -397,16 +410,18 @@ function recalc() {
 let cConf = null, cVis = null, cPowerVis = null, cPowerTime = null;
 
 function confAtUnit(unit, visPerUnit, p1, p2, tails) {
-  if (p1 <= 0 || p2 <= 0 || p2 >= 1 || visPerUnit < 1) return 0;
+  const count = isCountMetric(p1, p2);
+  if (p1 <= 0 || p2 <= 0 || (!count && p2 >= 1) || visPerUnit < 1) return 0;
   const n = unit * visPerUnit;
   const pp = (p1 + p2) / 2;
-  const se = Math.sqrt(pp * (1 - pp) * (2 / n));
-  if (se === 0) return 0;
+  const se = Math.sqrt(rateVariance(pp, count) * (2 / n));
+  if (!(se > 0)) return 0;
   const z = (p2 - p1) / se;
   return Math.max(0, Math.min(100, (1 - pFromZ(z, tails)) * 100));
 }
 
 function renderCharts() {
+  updateRail();
   if (!chartsDirty) return;
   chartsDirty = false;
 
@@ -710,47 +725,54 @@ function renderCharts() {
     }
   });
 
-  // Chart 4: Time to reach sample size (in units)
-  const timeByPower = powerLevels.map(p => {
-    const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
-    return isFinite(n) ? Math.ceil(n / visPerUnit) : null;
-  });
+  // Chart 4: Time to reach sample size — time units on x, power level on y
+  const timeByPower = powerLevels
+    .map(p => {
+      const n = sampleSizePerGroup(p1, expectedUplift, 1-targetConf, p);
+      return isFinite(n) ? { x: Math.ceil(n / visPerUnit), y: p * 100 } : null;
+    })
+    .filter(Boolean);
 
   if (cPowerTime) cPowerTime.destroy();
   cPowerTime = new Chart(document.getElementById('cPowerTime'), {
     type: 'line',
     data: {
-      labels: powerLabels,
       datasets: [{
-        label: 'Units to reach sample size',
+        label: 'Power reached',
         data: timeByPower,
         borderColor: '#7c3aed',
         backgroundColor: 'rgba(124,58,237,0.1)',
-        fill: true,
-        tension: 0.4,
+        fill: 'start',
+        tension: 0.3,
         pointRadius: 5,
         pointBackgroundColor: '#7c3aed',
         borderWidth: 2,
+        clip: false,
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 8, right: 8 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: c => c.raw !== null ? `${Math.round(c.raw)} units` : null
+            title: items => `${items[0].raw.x.toLocaleString()} time units`,
+            label: c => `${fmt(c.raw.y,0)}% power`
           }
         }
       },
       scales: {
-        y: {
-          title: { display: true, text: 'Time units', font: { size: 11 } },
-          ticks: { font: { size: 10 }, callback: v => Math.round(v).toLocaleString() }
-        },
         x: {
+          type: 'linear',
+          beginAtZero: true,
+          title: { display: true, text: 'Time units', font: { size: 11 } },
+          ticks: { font: { size: 10 }, precision: 0, callback: v => Math.round(v).toLocaleString() }
+        },
+        y: {
+          min: 70, max: 95,
           title: { display: true, text: 'Power level', font: { size: 11 } },
-          ticks: { font: { size: 10 } }
+          ticks: { font: { size: 10 }, stepSize: 5, callback: v => `${v}%` }
         }
       }
     }
@@ -788,8 +810,9 @@ function buildStateParams() {
   p.set('since', document.getElementById('scSince').value);
   p.set('scupl', document.getElementById('scUplift').value);
   p.set('theme', document.documentElement.getAttribute('data-theme') || 'light');
-  p.set('calc',  document.getElementById('calcToggle')?.checked ? '1' : '0');
+  p.set('calc',  document.getElementById('calcToggle')?.dataset.state || 'full');
   p.set('proj',  document.getElementById('projToggle')?.checked ? '1' : '0');
+  p.set('sb',    document.querySelector('.dashboard')?.classList.contains('sidebar-collapsed') ? '1' : '0');
   p.set('nv',    variants.length);
   variants.forEach((vr, i) => {
     p.set(`vd${i}`, document.getElementById(vr.id + '-dist').value);
@@ -825,15 +848,12 @@ function restoreFromParams() {
   const type = p.get('type');
   if (type) document.querySelector(`input[name="sType"][value="${type}"]`)?.click();
 
-  setKnobDisplay('ctrl', parseInt(p.get('cd')) || 50);
-  document.getElementById('ctrl-n').value = p.get('cn') || 5000;
-  document.getElementById('ctrl-c').value = p.get('cc') || 250;
-
   if (p.has('calc')) {
-    const showCalc = p.get('calc') !== '0';
-    const toggle = document.getElementById('calcToggle');
-    if (toggle) { toggle.checked = showCalc; toggleCollapse(showCalc, true); }
+    // Legacy binary links: 0 = summary, 1 = full
+    const raw = p.get('calc');
+    setCalcMode(raw === '0' ? 'on' : raw === '1' ? 'full' : raw, true);
   }
+  if (p.get('sb') === '1') toggleSidebar(true, true);
   if (p.has('proj')) {
     const showProj = p.get('proj') !== '0';
     const toggle = document.getElementById('projToggle');
@@ -844,15 +864,18 @@ function restoreFromParams() {
   if (p.has('scupl')) { const el = document.getElementById('scUplift');el.value = p.get('scupl'); el.dataset.manual = '1'; }
 
   const nv = parseInt(p.get('nv')) || 0;
-  for (let i = 0; i < nv; i++) {
-    addVariant();
-    const id = variants[variants.length - 1].id;
-    const dist = parseInt(p.get(`vd${i}`)) || 50;
-    setKnobDisplay(id, dist);
-    document.getElementById(id + '-dist').value = dist;
-    document.getElementById(id + '-n').value = p.get(`vn${i}`) || 5000;
-    document.getElementById(id + '-c').value = p.get(`vc${i}`) || 0;
-  }
+  for (let i = 0; i < nv; i++) addVariant();
+
+  // Apply values only after all variants exist: addVariant() rebalances every group to an even split
+  variants.forEach((vr, i) => {
+    setKnobDisplay(vr.id, parseInt(p.get(`vd${i}`)) || 50);
+    document.getElementById(vr.id + '-n').value = p.get(`vn${i}`) || 5000;
+    document.getElementById(vr.id + '-c').value = p.get(`vc${i}`) || 0;
+  });
+  setKnobDisplay('ctrl', parseInt(p.get('cd')) || 50);
+  document.getElementById('ctrl-n').value = p.get('cn') || 5000;
+  document.getElementById('ctrl-c').value = p.get('cc') || 250;
+  document.getElementById('sTotalVis').value = p.get('vis');
 
   _restoring = false;
   recalc();
@@ -885,26 +908,90 @@ function copyChart(chartId) {
   }, 'image/png');
 }
 
-// Boot: restore from URL or render defaults
-if (!restoreFromParams()) {
-  addVariant();
-  document.getElementById('v0-c').value = 280;
-  recalc();
-}
-
 function toggleProjection(show, skipHistory) {
   const hidden = !show;
   document.getElementById('powerChartsRow')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerRadioGroup')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('projectionSidebarLabel')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('projectionSidebar')?.classList.toggle('proj-hidden', hidden);
+  updateRail();
   if (!skipHistory && !_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
-function toggleCollapse(showCalc, skipHistory) {
+// Result detail level: off = one-line result, on = summary, full = summary + calculation steps
+const CALC_MODES = ['off', 'on', 'full'];
+const CALC_MODE_LABELS = { off: 'Off', on: 'On', full: 'Full' };
+
+function setCalcMode(mode, skipHistory) {
+  if (!CALC_MODES.includes(mode)) mode = 'full';
+  const group = document.getElementById('calcToggle');
+  group.dataset.state = mode;
+  const radio = group.querySelector(`input[value="${mode}"]`);
+  if (radio) radio.checked = true;
+  document.getElementById('calcToggleState').textContent = CALC_MODE_LABELS[mode];
   const grid = document.getElementById('groupsGrid');
-  grid.classList.toggle('calc-hidden', !showCalc);
-  if (!skipHistory) {
-    history.replaceState(null, '', '?' + buildStateParams().toString());
-  }
+  grid.classList.toggle('calc-hidden', mode !== 'full');
+  grid.classList.toggle('calc-collapsed', mode === 'off');
+  if (!skipHistory && !_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
+
+function toggleSidebar(collapse, skipHistory) {
+  const dash = document.querySelector('.dashboard');
+  const c = typeof collapse === 'boolean' ? collapse : !dash.classList.contains('sidebar-collapsed');
+  dash.classList.toggle('sidebar-collapsed', c);
+  const btn = document.getElementById('sidebarCollapseBtn');
+  const txt = c ? 'Expand sidebar' : 'Collapse sidebar';
+  btn.setAttribute('aria-label', txt);
+  btn.title = txt;
+  updateRail();
+  positionCollapseHandle();
+  if (!skipHistory && !_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
+}
+
+// Keep the collapse handle at the vertical middle of the visible part of the (sticky) sidebar
+function positionCollapseHandle() {
+  const btn = document.getElementById('sidebarCollapseBtn');
+  const sb = document.getElementById('groupsSidebar');
+  if (!btn || !sb) return;
+  const r = sb.getBoundingClientRect();
+  const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
+  btn.style.top = `${(top + bottom) / 2}px`;
+}
+window.addEventListener('scroll', positionCollapseHandle, { passive: true });
+window.addEventListener('resize', positionCollapseHandle);
+
+function updateRail() {
+  const visEl = document.getElementById('railVis');
+  if (!visEl) return;
+  const vis = parseInt(document.getElementById('sTotalVis').value) || 0;
+  visEl.textContent = vis.toLocaleString();
+
+  const conf  = parseFloat(document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
+  const tails = document.querySelector('input[name="sType"]:checked')?.value || '2';
+  const power = parseFloat(document.querySelector('input[name="sPower"]:checked')?.value || '0.80');
+  const pct = x => `${+(x * 100).toFixed(3)}%`;
+  const chips = [
+    ['Conf', pct(conf)],
+    ['Test', tails === '2' ? '2-tail' : '1-tail'],
+  ];
+  if (document.getElementById('projToggle')?.checked) {
+    const since = document.getElementById('scSince').value;
+    const upl = parseFloat(document.getElementById('scUplift').value);
+    chips.push(
+      ['Power', pct(power)],
+      ['Since', since || '—'],
+      ['Uplift', isFinite(upl) ? `${upl > 0 ? '+' : ''}${upl}%` : '—'],
+    );
+  }
+  document.getElementById('railChips').innerHTML = chips
+    .map(([k, val]) => `<span class="rail-chip"><span class="rail-chip-k">${k}</span><span class="rail-chip-v">${val}</span></span>`)
+    .join('');
+}
+
+// Boot: restore from URL or render defaults
+if (!restoreFromParams()) {
+  addVariant();
+  document.getElementById('v0-c').value = 280;
+  recalc();
+}
+positionCollapseHandle();

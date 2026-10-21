@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CONFIDENCE — A/B Test Calculator</title>
+<title>Confidence Calculator — A/B Test Calculator</title>
 <meta name="description" content="A simple confidence calculator for A/B tests. Calculate confidence levels, p-values, power, uplift, visitor needs and Bonferroni-adjusted thresholds without pretending you need to be a data scientist.">
 <link rel="stylesheet" href="style.css">
 <script>
@@ -16,18 +16,20 @@
 <header>
   <div class="header-inner">
     <div class="header-brand">
-      <h1>CONFIDENCE</h1>
+      <h1>Confidence Calculator</h1>
       <p>A/B testing made easy — by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
     </div>
     <div class="header-actions">
-      <label class="calc-toggle" aria-label="Show calculation details" title="Show / hide calculation details">
-        <input type="checkbox" id="calcToggle" checked onchange="toggleCollapse(this.checked)">
+      <div class="calc-toggle calc-toggle--tri" id="calcToggle" data-state="full" role="radiogroup" aria-label="Calculation details">
         <span class="calc-toggle-track">
           <span class="calc-toggle-thumb"></span>
+          <label class="tri-zone" title="Off — one-line result"><input type="radio" name="calcMode" value="off" onchange="setCalcMode(this.value)" aria-label="Off — one-line result"></label>
+          <label class="tri-zone" title="On — result summary"><input type="radio" name="calcMode" value="on" onchange="setCalcMode(this.value)" aria-label="On — result summary"></label>
+          <label class="tri-zone" title="Full — summary + calculation steps"><input type="radio" name="calcMode" value="full" checked onchange="setCalcMode(this.value)" aria-label="Full — summary and calculation steps"></label>
         </span>
-        <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6l6 7-6 7h12"/></svg>
-        <span class="calc-toggle-label">Calc</span>
-      </label>
+        <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 4H6l6 7-6 7h12"/></svg>
+        <span class="calc-toggle-label" aria-hidden="true">Calc · <span class="calc-toggle-state" id="calcToggleState">Full</span></span>
+      </div>
       <label class="calc-toggle" aria-label="Show projection charts" title="Show / hide projection charts">
         <input type="checkbox" id="projToggle" checked onchange="toggleProjection(this.checked)">
         <span class="calc-toggle-track">
@@ -36,6 +38,10 @@
         <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.636-7 10-7 10 7 10 7-3.636 7-10 7S2 12 2 12z"/></svg>
         <span class="calc-toggle-label">Projection</span>
       </label>
+      <button class="share-btn" onclick="openImport()" aria-label="Import data" title="Paste a table from Adobe Analytics / Target, CSV, Excel or Sheets (or just press Ctrl/⌘+V)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg>
+        Import
+      </button>
       <button class="share-btn" onclick="shareState()" aria-label="Share">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Share
@@ -49,42 +55,21 @@
 <div class="dashboard">
 
   <!-- ── LEFT SIDEBAR: controls only ─────────────────────────────────── -->
-  <aside class="groups-sidebar">
+  <aside class="groups-sidebar" id="groupsSidebar">
+    <!-- Collapsed rail: read-only summary, click to expand -->
+    <div class="sidebar-rail" onclick="toggleSidebar(false)" title="Expand sidebar">
+      <div class="rail-visitors">
+        <span class="rail-vis-label">Overall visitors</span>
+        <span class="rail-vis-val" id="railVis">—</span>
+      </div>
+      <div class="rail-chips" id="railChips"></div>
+    </div>
+
     <div class="gs-header">
       <div class="fg traffic-total">
         <label>Overall Visitors</label>
         <div class="traffic-row">
           <input type="number" id="sTotalVis" value="10000" min="1" class="input--key" oninput="onTotalVisChange()">
-          <button class="gs-even-btn" onclick="distributeEvenly()" aria-label="Distribute evenly">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/>
-            </svg>
-            Even split
-          </button>
-        </div>
-      </div>
-
-      <!-- Control group section -->
-      <div class="sidebar-section-label">Control Group</div>
-      <div class="sidebar-control" id="grp-ctrl">
-        <div class="fg dist-fg">
-          <label>Distribution</label>
-          <div class="knob-row">
-            <input type="range" id="ctrl-dist" value="50" min="1" max="99" step="1" class="dist-knob" oninput="onDistKnob('ctrl',this.value)" onchange="onDistKnob('ctrl',this.value)">
-            <span class="dist-knob-val" id="ctrl-dist-val">50%</span>
-          </div>
-        </div>
-        <div class="fg">
-          <label>Visitors</label>
-          <input type="number" id="ctrl-n" value="5000" min="1" class="input--key" oninput="onVisitorsChange('ctrl')">
-        </div>
-        <div class="fg">
-          <label>Conversions</label>
-          <input type="number" id="ctrl-c" value="250" min="0" class="input--key" oninput="recalc()">
-        </div>
-        <div class="fg">
-          <label>Rate</label>
-          <div class="rate-display" id="ctrl-rate">5.00%</div>
         </div>
       </div>
     </div>
@@ -139,6 +124,11 @@
     </div>
   </aside>
 
+  <!-- Collapse handle: outside the sidebar so it can straddle its edge -->
+  <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn" onclick="toggleSidebar()" aria-label="Collapse sidebar" title="Collapse sidebar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+  </button>
+
   <!-- ── MAIN ─────────────────────────────────────────────────────────── -->
   <main class="main-area">
 
@@ -149,6 +139,40 @@
 
     <!-- Group + result columns grid -->
     <div class="groups-grid" id="groupsGrid">
+
+      <!-- Control column: same structure as variant columns so fields align row by row -->
+      <div class="group-col" id="col-ctrl">
+        <div class="group-row ctrl-row" id="grp-ctrl">
+          <div class="group-row-header">
+            <span class="group-badge badge-ctrl">Control</span>
+            <button type="button" class="btn-split" onclick="distributeEvenly()" title="Split visitors evenly across all groups">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
+              Split
+            </button>
+          </div>
+          <div class="group-row-fields">
+            <div class="fg dist-fg">
+              <label>Distribution</label>
+              <div class="knob-row">
+                <input type="range" id="ctrl-dist" value="50" min="1" max="99" step="1" class="dist-knob" oninput="onDistKnob('ctrl',this.value)" onchange="onDistKnob('ctrl',this.value)">
+                <span class="dist-knob-val" id="ctrl-dist-val">50%</span>
+              </div>
+            </div>
+            <div class="fg">
+              <label>Visitors</label>
+              <input type="number" id="ctrl-n" value="5000" min="1" class="input--key" oninput="onVisitorsChange('ctrl')">
+            </div>
+            <div class="fg">
+              <label>Conversions</label>
+              <input type="number" id="ctrl-c" value="250" min="0" class="input--key" oninput="recalc()">
+            </div>
+            <div class="fg">
+              <label>Rate</label>
+              <div class="rate-display" id="ctrl-rate">5.00%</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Variant columns injected here by addVariant() -->
       <!-- Each column: group card on top, result card below -->
@@ -220,9 +244,49 @@
   </main>
 </div><!-- /.dashboard -->
 
+<!-- Paste import dialog -->
+<dialog id="importDialog" class="import-dialog" aria-labelledby="importTitle">
+  <form method="dialog" class="import-inner" onsubmit="return false">
+    <div class="import-head">
+      <div>
+        <div class="import-title" id="importTitle">Import test data</div>
+        <div class="import-sub">Copy the table from Adobe Analysis Workspace (A4T panel or freeform table), a Target report CSV, Excel or Google Sheets, then paste it here. One row per experience. Nothing leaves your browser.</div>
+      </div>
+      <button type="button" class="btn-remove import-close" onclick="closeImport()" aria-label="Close">✕</button>
+    </div>
+
+    <textarea id="importText" class="import-text" spellcheck="false" placeholder="Experience&#9;Unique Visitors&#9;Orders&#10;Experience A (Control)&#9;1,610&#9;7,897&#10;Experience B&#9;1,617&#9;8,104" oninput="onImportInput()"></textarea>
+
+    <div class="import-status" id="importStatus"></div>
+
+    <div class="import-map" id="importMap">
+      <div class="fg">
+        <label for="importVisCol">Visitors column</label>
+        <select id="importVisCol" onchange="onImportMapChange()"></select>
+      </div>
+      <div class="fg">
+        <label for="importConvCol">Conversions column</label>
+        <select id="importConvCol" onchange="onImportMapChange()"></select>
+      </div>
+      <div class="fg">
+        <label for="importCtrlRow">Control row</label>
+        <select id="importCtrlRow" onchange="onImportMapChange()"></select>
+      </div>
+    </div>
+
+    <div class="import-preview" id="importPreview"></div>
+
+    <div class="import-actions">
+      <button type="button" class="import-btn" onclick="closeImport()">Cancel</button>
+      <button type="button" class="import-btn import-btn--primary" id="importApply" onclick="applyImport()" disabled>Apply</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="concepts.js"></script>
 <script src="sidebar.js"></script>
 <script src="app.js"></script>
+<script src="import.js"></script>
 <script>
 function toggleTheme() {
   const root = document.documentElement;
