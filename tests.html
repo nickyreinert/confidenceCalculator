@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confidence Calculator regression tests</title>
+<h1>Regression tests</h1>
+<pre id="results" role="status">Running...</pre>
+<iframe id="calculator" title="Calculator under test" style="width:100%;height:800px" src="index.html?vis=2400&amp;conf=0.95&amp;pwr=0.80&amp;type=2&amp;cd=33&amp;cn=800&amp;cc=80&amp;since=14&amp;scupl=20&amp;calc=off&amp;proj=0&amp;sb=1&amp;dd=0&amp;nv=2&amp;vd0=38&amp;vn0=900&amp;vc0=100&amp;vd1=29&amp;vn1=700&amp;vc1=90"></iframe>
+<script>
+document.getElementById('calculator').addEventListener('load', () => {
+  const frame = document.getElementById('calculator');
+  const calculator = frame.contentWindow;
+  const results = [];
+  const assert = (condition, name) => {
+    results.push(`${condition ? 'PASS' : 'FAIL'} ${name}`);
+    if (!condition) throw new Error(name);
+  };
+  const close = (actual, expected, tolerance = 0.000001) => Math.abs(actual - expected) < tolerance;
+  try {
+    assert(typeof calculator.relativeInterval === 'function', 'Calculator loaded');
+    const interval = calculator.relativeInterval(1000, 100, 1000, 112);
+    assert(close(interval.uplift, 0.12) && close(interval.lower, -0.131427419) && close(interval.upper, 0.444552166), 'Score interval numerical regression');
+    const significant = calculator.relativeInterval(1000, 100, 1000, 150);
+    assert(significant.lower > 0 && significant.upper > significant.uplift, 'Second illustrative dataset excludes zero');
+    const wider = calculator.relativeInterval(1000, 100, 1000, 112, 0.01);
+    assert(wider.lower < interval.lower && wider.upper > interval.upper, 'Selected confidence level changes interval width');
+    const swapped = calculator.relativeInterval(1000, 112, 1000, 100);
+    assert(close(swapped.lower, 1/(1+interval.upper)-1) && close(swapped.upper, 1/(1+interval.lower)-1), 'Group swapping inverts relative-rate interval');
+    let comparisons = 0;
+    for (const n1 of [10, 100, 1000]) for (const n2 of [15, 100, 1500])
+    for (const fraction1 of [0.01, 0.1, 0.5, 1, 1.5]) for (const fraction2 of [0, 0.02, 0.12, 0.5, 1, 2])
+    for (const alpha of [0.1, 0.05, 0.01, 0.00001, 0.05/5]) {
+      const c1 = Math.max(1, Math.round(n1*fraction1)), c2 = Math.round(n2*fraction2);
+      const bounds = calculator.relativeInterval(n1, c1, n2, c2, alpha);
+      const p = calculator.pFromZ(calculator.zTest(n1, c1, n2, c2).z, 2);
+      if ((bounds.lower > 0 || bounds.upper < 0) !== (p < alpha)) throw new Error('Test/interval mismatch');
+      if (!(bounds.lower <= bounds.uplift && bounds.upper >= bounds.uplift)) throw new Error('Estimate outside interval');
+      comparisons++;
+    }
+    assert(comparisons === 1350, '1,350 test/interval checks: unequal allocation, boundaries, Poisson counts and Bonferroni');
+    assert(calculator.relativeInterval(0, 0, 100, 10) === null && calculator.relativeInterval(10, -1, 10, 2) === null && calculator.relativeInterval(10, 1.5, 10, 2) === null, 'Invalid counts and zero visitors rejected');
+    assert(calculator.relativeInterval(100, 0, 100, 10).uplift === null && calculator.relativeInterval(100, 0, 100, 0).lower === null, 'Zero control conversions explicitly undefined');
+    const zero = calculator.relativeInterval(1000, 100, 1000, 0);
+    assert(zero.lower === -1 && zero.upper < 0, 'Zero variant conversions: -100% estimate with non-degenerate interval');
+    const oneSided = calculator.relativeInterval(1000, 100, 1000, 150, 0.05, 1);
+    assert(oneSided.lower > 0 && oneSided.upper === Infinity && calculator.pFromZ(-3, 1) > 0.99, 'One-sided increase test uses direction and unbounded upper endpoint');
+    assert(close(calculator.powerFromN(1000, 1000, 0.1, 0.1, 0.05, 2), 5, 0.001), 'Power at zero assumed effect equals alpha');
+    assert(calculator.powerFromN(5000, 5000, 0.1, 0.12, 0.05, 2) > calculator.powerFromN(1000, 1000, 0.1, 0.12, 0.05, 2), 'Power grows with sample size');
+    assert(calculator.powerFromN(1000, 1000, 0.1, 0.12, 0.01, 2) < calculator.powerFromN(1000, 1000, 0.1, 0.12, 0.05, 2), 'Stricter alpha reduces power');
+    const doc = calculator.document;
+    const snapshot = () => [...doc.querySelectorAll('input')].map(element => [element.id, element.name, element.value, element.checked, element.dataset.manual]);
+    const before = JSON.stringify(snapshot());
+    const url = calculator.location.href;
+    const params = calculator.buildStateParams().toString();
+    const controlColumn = doc.getElementById('col-v0');
+    doc.getElementById('exampleStart').focus();
+    calculator.startExample();
+    assert(doc.getElementById('exampleDialog').matches(':modal'), 'Native modal focus containment');
+    assert(doc.activeElement.id === 'exampleTitle', 'Initial focus moves to dialog title');
+    assert(doc.getElementById('scUplift').value === '20' && doc.getElementById('ctrl-c').value === '100', 'Illustrative dataset and separate power assumption');
+    assert(calculator.location.href === url, 'Entering example does not overwrite shared URL');
+    assert(doc.getElementById('exampleText').textContent.includes('SPECIFIED SIZE'), 'Power explanation');
+    doc.getElementById('exampleDialog').dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    assert(doc.getElementById('exampleTitle').textContent.startsWith('Significance'), 'Keyboard Next and significance explanation');
+    calculator.exampleGo(1);
+    assert(doc.querySelectorAll('.interval-zero').length === 2 && doc.getElementById('exampleContext').textContent.includes('Excludes zero') && doc.getElementById('exampleContext').textContent.includes('Includes zero'), 'Both computed intervals with visible zero markers');
+    calculator.exampleGo(-1);
+    assert(doc.getElementById('exampleTitle').textContent.startsWith('Significance'), 'Previous navigation');
+    doc.getElementById('exampleDialog').dispatchEvent(new calculator.Event('cancel', { cancelable: true }));
+    assert(!doc.getElementById('exampleDialog') && doc.getElementById('exampleBanner').hidden, 'Escape/cancel exits example');
+    assert(JSON.stringify(snapshot()) === before && doc.getElementById('col-v0') === controlColumn, 'All original input values, manual flags and variant nodes restored');
+    assert(calculator.location.href === url && calculator.buildStateParams().toString() === params, 'Sharing state restored exactly');
+    assert(doc.activeElement.id === 'exampleStart', 'Exit restores focus');
+    calculator.startExample();
+    doc.getElementById('exampleDialog').dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert(!doc.getElementById('exampleDialog') && JSON.stringify(snapshot()) === before, 'Escape key and repeated entry/exit are reversible');
+    const daily = { dates: ['2026-10-01'], groups: [{ label: 'Control', n: [800], c: [80] }, { label: 'Variant A', n: [900], c: [100] }] };
+    calculator.startExample();
+    assert(calculator.preserveExampleData(daily, 'completed-import'), 'Pending daily import is saved for original inputs');
+    calculator.exitExample();
+    assert(calculator.eval('deepData') === daily && calculator.eval('deepEncoded') === 'completed-import' && calculator.eval('deepPending') === '', 'Completed daily import survives example exit');
+    calculator.setDeepData(null);
+    const assumed = doc.getElementById('scUplift').value;
+    doc.getElementById('v0-c').value = 250;
+    calculator.recalc();
+    assert(doc.getElementById('scUplift').value === assumed, 'Observed uplift never overwrites power effect');
+    calculator.setCalcMode('off');
+    assert(calculator.getComputedStyle(doc.getElementById('effect-v0')).display !== 'none', 'Uplift and interval visible with calculation details off');
+    doc.getElementById('ctrl-c').value = 0;
+    calculator.recalc();
+    assert(doc.getElementById('effect-v0').textContent.includes('undefined'), 'Zero control conversions visibly undefined');
+    doc.getElementById('ctrl-c').value = 80;
+    doc.getElementById('v0-n').value = 0;
+    calculator.recalc();
+    assert(doc.getElementById('currentPower').textContent.includes('unavailable'), 'Zero-visitor variant is not omitted from power calculation');
+    doc.getElementById('ctrl-n').value = 0;
+    calculator.recalc();
+    assert(doc.getElementById('result-v0').textContent.includes('at least one visitor'), 'Zero visitors visibly invalid');
+    results.push('All checks passed.');
+    document.documentElement.dataset.tests = 'passed';
+  } catch (error) {
+    results.push(`ERROR ${error.message}`);
+    document.documentElement.dataset.tests = 'failed';
+  }
+  document.getElementById('results').textContent = results.join('\n');
+});
+</script>
+</html>

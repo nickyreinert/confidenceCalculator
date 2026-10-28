@@ -55,6 +55,7 @@
         Share
       </button>
       <button class="theme-btn tour-btn" onclick="startTour()" aria-label="Quick tour" title="Quick tour — how this calculator works">?</button>
+      <button class="share-btn" id="exampleStart" onclick="startExample()">Example mode</button>
       <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
     </div>
     <div class="share-toast" id="shareToast">Link copied!</div>
@@ -96,7 +97,7 @@
     <div class="sidebar-settings">
       <div class="sidebar-section-label">Parameters</div>  
       <div class="radio-group">
-        <span class="radio-label">Confidence <button class="help-btn" data-tooltip="Your chosen threshold. In this calculator, confidence is shown as 1 − p-value: higher confidence means lower Type-I error risk, not a guarantee." onclick="openConcept('confidence')">?</button></span>
+        <span class="radio-label">Confidence level <button class="help-btn" data-tooltip="Long-run coverage of new intervals. 95% corresponds to α = 5% for matching tests and intervals, not a 95% probability the variant wins." onclick="openConcept('confidence')">?</button></span>
         <div class="radio-pills" id="confRadios">
           <label class="radio-pill"><input type="radio" name="sConf" value="0.90" onchange="recalc()"><span>90%</span></label>
           <label class="radio-pill"><input type="radio" name="sConf" value="0.95" checked onchange="recalc()"><span>95%</span></label>
@@ -107,17 +108,17 @@
         </div>
       </div>
       <div class="radio-group">
-        <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed checks both directions: increase or decrease. One-tailed checks only one direction and reaches confidence faster, but can miss the opposite effect." onclick="openConcept('althypothesis')">?</button></span>
+        <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed checks increases and decreases. One-tailed tests an increase only: choose the direction before collecting data." onclick="openConcept('althypothesis')">?</button></span>
         <div class="radio-pills" id="typeRadios">
           <label class="radio-pill"><input type="radio" name="sType" value="2" checked onchange="recalc()"><span>Two-tailed</span></label>
-          <label class="radio-pill"><input type="radio" name="sType" value="1" onchange="recalc()"><span>One-tailed</span></label>
+          <label class="radio-pill"><input type="radio" name="sType" value="1" onchange="recalc()"><span>One-tailed (increase)</span></label>
         </div>
       </div>
       
       <!-- Projection inputs -->
       <div id="projectionSidebarLabel" class="sidebar-section-label">Projection</div>
       <div class="radio-group" id="powerRadioGroup">
-        <span class="radio-label">Power <button class="help-btn" data-tooltip="Planning only: if a real effect exists, how likely is this test to detect it? Higher power lowers false-negative risk, but needs more visitors." onclick="openConcept('power')">?</button></span>
+        <span class="radio-label">Target power <button class="help-btn" data-tooltip="IF a real effect of the separately assumed size exists, 80% power detects it in about 80 of 100 comparable experiments. This is a planning target, not the probability the observed result is correct." onclick="openConcept('power')">?</button></span>
         <div class="radio-pills" id="powerRadios">
           <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
           <label class="radio-pill"><input type="radio" name="sPower" value="0.90" onchange="recalc()"><span>90%</span></label>
@@ -134,9 +135,10 @@
         <span class="hint" id="scSinceHint">Time units the test has been live — days, weeks, whatever you use consistently. Or pick a start date to count days.</span>
       </div>
       <div class="fg">
-        <label>Expected uplift (%) <button class="help-btn" data-tooltip="Your planning assumption about the effect size. It is relative: from 5% to 5.5% conversion is +10% uplift, not +10 percentage points." onclick="openConcept('uplift')">?</button></label>
-        <input type="number" id="scUplift" step="0.5" placeholder="auto" oninput="chartsDirty=true;renderCharts()">
-        <span class="hint">Expected or observed relative change — drives power charts</span>
+        <label for="scUplift">Assumed relevant effect for power (%) <button class="help-btn" data-tooltip="Choose an effect that matters before testing. This is a relative change, not the observed result." onclick="openConcept('power')">?</button></label>
+        <input type="number" id="scUplift" value="10" step="0.5" min="-100" oninput="chartsDirty=true;renderCharts()">
+        <span class="hint">Separate planning assumption, never filled from observed uplift.</span>
+        <output class="hint" id="currentPower" for="scUplift ctrl-n"></output>
       </div>
       <div class="alert alert-info sidebar-help-note">
         Plan the target before you stare at the result: confidence threshold, running time and visitors. Checking every day and stopping the second it looks good is p-hacking. <button class="help-btn" data-tooltip="Define the target first. Otherwise one lucky day can make noise look like a winner." onclick="openConcept('pvalue')">?</button>
@@ -168,8 +170,19 @@
 
     <!-- Bonferroni alert -->
     <div id="bonferroniAlert" class="alert alert-warn" style="display:none">
-      With <strong id="bfCount">2</strong> variants running simultaneously, each result needs to reach <strong id="bfAlpha">97.5%</strong> confidence to count as a win — not <strong id="bfTargetConf">95%</strong>. The more variants you test at once, the higher that bar gets. <button class="help-btn" data-tooltip="More variants means more chances to find a lucky winner. Bonferroni divides the significance level by the number of comparisons, so the per-variant bar gets stricter." onclick="openConcept('bonferroni')">?</button>
+      With <strong id="bfCount">2</strong> variants, intervals use <strong id="bfAlpha">97.5%</strong> per-comparison coverage for the selected <strong id="bfTargetConf">95%</strong> family confidence level. The matching p-value threshold is α divided by the number of variants. <button class="help-btn" data-tooltip="Bonferroni adjusts both the interval and the test for multiple comparisons." onclick="openConcept('bonferroni')">?</button>
     </div>
+
+    <section class="concept-summary" aria-label="Three statistical concepts">
+      <p><strong>Power:</strong> IF a real effect of the SPECIFIED SIZE exists, 80 out of 100 comparable experiments would detect it at 80% power. This is conditional on an assumed effect, not the probability today's result is correct.</p>
+      <p><strong>Significance level (α):</strong> IF there is NO REAL EFFECT, α = 5% means about 5 out of 100 comparable experiments would falsely report a significant difference. α is chosen; the p-value is observed; p &lt; α gives the decision.</p>
+      <p><strong>Confidence interval:</strong> Repeat the experiment and calculate a NEW interval each time. About 95 out of 100 intervals from a 95% confidence method would contain the TRUE effect, which could be positive, negative, or zero.</p>
+      <details><summary>What these numbers do not mean</summary>
+        <p>95% confidence corresponds to α = 5% for matching tests and intervals. It is not a 95% probability the variant wins or the measured uplift will repeat. Coverage concerns different intervals across experiments, not 95% of future results falling inside today's interval.</p>
+        <p>Not significant does not establish no effect. Sufficient power does not establish sufficient calendar duration. Plan full business cycles and a stopping rule in advance; repeatedly checking and stopping at significance invalidates the fixed-sample error rate.</p>
+      </details>
+    </section>
+    <div id="exampleBanner" class="alert alert-info" hidden>Example mode · Illustrative data, not a real experiment. <button type="button" class="btn-split" onclick="exitExample()">Exit example mode</button></div>
 
     <!-- Group + result columns grid -->
     <div class="groups-grid" id="groupsGrid">
@@ -224,7 +237,7 @@
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
-              <div class="chart-box-title">Confidence over time</div>
+              <div class="chart-box-title">Projected evidence over time (1 − p)</div>
             </div>
             <button class="chart-copy-btn" onclick="copyChart('cConf')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
@@ -242,7 +255,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cVis"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Confidence over time at different visitor volumes — because traffic decides how fast evidence piles up</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Projected 1 − p at different traffic volumes, conditional on the assumed effect. Not a confidence level or a stopping rule.</div>
         </div>
       </div>
 
@@ -309,7 +322,7 @@
           </div>
           <div class="chart-box">
             <div class="chart-box-header">
-              <div class="chart-title-group"><div class="scen-chart-title">Actual confidence over time</div></div>
+              <div class="chart-title-group"><div class="scen-chart-title">Observed evidence over time (1 − p)</div></div>
               <button class="chart-copy-btn" onclick="copyChart('cDeepConf')" aria-label="Copy chart image" title="Copy chart">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
               </button>
@@ -392,9 +405,11 @@
 <script src="concepts.js"></script>
 <script src="sidebar.js"></script>
 <script src="deepdive.js"></script>
+<script src="statistics.js"></script>
 <script src="app.js"></script>
 <script src="import.js"></script>
 <script src="tour.js"></script>
+<script src="example.js"></script>
 <script>
 function toggleTheme() {
   const root = document.documentElement;

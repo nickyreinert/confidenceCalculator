@@ -2,12 +2,12 @@
 const CONCEPTS = {
   confidence: {
     label: 'Confidence Level',
-    tooltip: 'In this calculator: confidence = 1 − p-value. Higher confidence means lower Type-I error risk, not a magic guarantee.',
+    tooltip: 'The long-run coverage of newly calculated intervals, not a probability that the variant wins. 95% confidence matches α = 5%.',
     deep: `
-      <p>You want to make sure the result of your A/B test is not just coincidence, luck or plain noise.</p>
-      <p>In this calculator, confidence is reported as <code>confidence = 1 − p-value</code>. So a p-value of 0.05 is shown as 95% confidence.</p>
-      <p>Strictly speaking, confidence levels and p-values are distinct statistical concepts. But this representation is common in A/B testing tools because it is intuitive for non-specialists — and yes, that is what this calculator reports.</p>
-      <p>Higher confidence means a lower chance of a <strong>Type-I error</strong>: a false positive where the test suggests an effect exists while, in reality, no effect exists.</p>
+      <p>Repeat the experiment and calculate a NEW interval each time. About 95 out of 100 intervals constructed using a 95% confidence method would contain the TRUE effect, which could be positive, negative, or zero.</p>
+      <p>Coverage concerns different intervals across experiments with a fixed true effect, not 95% of future results falling inside today's interval. It is not a 95% probability the variant wins or the measured uplift will repeat.</p>
+      <p>For matching tests and intervals, a 95% confidence level corresponds to significance level α = 5%. The selected confidence level is not <code>1 − p-value</code>.</p>
+      <p>The relative uplift interval inverts a two-sample score test for the rate ratio. Excluding zero matches the two-sided significance decision. Multiple comparisons use the same Bonferroni-adjusted α in the test and interval. A one-sided increase test uses a matching lower bound instead.</p>
       <h4>Common thresholds</h4>
       <ul>
         <li><strong>90%</strong> — exploratory tests, low-stakes decisions</li>
@@ -24,7 +24,7 @@ const CONCEPTS = {
       <p>In other words: if the null hypothesis were true, how surprising would a difference this large be?</p>
       <p><strong>p = 0.04</strong> means: if there were truly no difference, random sampling would produce a gap this large only 4% of the time.</p>
       <p>The significance level is the threshold; the p-value is the result. The p-value must be below your significance level before you reject the null hypothesis.</p>
-      <p>Relationship in this calculator: <code>confidence = 1 − p</code>. So p = 0.05 becomes 95% confidence.</p>
+      <p>IF there is NO REAL EFFECT, a 5% significance level means about 5 out of 100 comparable experiments would falsely report a statistically significant difference. This error rate requires a preplanned test, not repeatedly checking and stopping at significance.</p>
       <h4>Common misconceptions</h4>
       <ul>
         <li>p-value is <strong>not</strong> the probability the variant is better.</li>
@@ -83,12 +83,14 @@ const CONCEPTS = {
   },
   power: {
     label: 'Statistical Power',
-    tooltip: 'If a real effect exists, how likely is your test to detect it? Higher power means fewer false negatives.',
+    tooltip: 'IF a real effect of the SPECIFIED SIZE exists, how often would comparable tests detect it? Power is not the probability the observed result is correct.',
     deep: `
-      <p>Power answers this question: assuming there is a real effect, how likely is this test to detect it?</p>
-      <p>It is almost the opposite side of confidence. Confidence is about avoiding a <strong>Type-I error</strong> or false positive. Power is about avoiding a <strong>Type-II error</strong> or false negative.</p>
+      <p>IF a real effect of the SPECIFIED SIZE exists, 80 out of 100 comparable experiments would detect it as statistically significant at 80% power.</p>
+      <p>Choose a separate, relevant effect size for planning. Power calculated from today's observed uplift is not independent evidence that the result is correct. The calculator never automatically copies observed uplift into this assumption.</p>
+      <p>Power concerns false negatives conditional on an assumed effect. Significance level α concerns false positives when the true effect is zero. Neither is the probability that today's decision is right.</p>
       <p><code>Power = 1 − β</code>, where β is the Type-II error rate. At <strong>80% power</strong>, you still miss the assumed real effect 20% of the time.</p>
       <p>Power is not part of the p-value calculation for the observed result. It helps you estimate before the test starts how many visitors are needed to reliably detect an effect.</p>
+      <p>Sufficient power does not establish sufficient calendar duration. Plan business cycles and a stopping rule in advance; do not repeatedly check and stop when significance appears.</p>
       <h4>Power depends on</h4>
       <ul>
         <li>The true effect size (bigger effect → easier to detect)</li>

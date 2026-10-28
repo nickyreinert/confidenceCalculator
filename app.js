@@ -39,6 +39,7 @@ function rateVariance(p, count) {
 }
 
 function zTest(n1, c1, n2, c2) {
+  if (!(n1 > 0) || !(n2 > 0) || c1 < 0 || c2 < 0) return { z: NaN, p1: NaN, p2: NaN, pp: NaN, se: NaN, count: false };
   const p1 = c1/n1, p2 = c2/n2;
   const pp = (c1+c2)/(n1+n2);
   const count = isCountMetric(p1, p2);
@@ -48,7 +49,7 @@ function zTest(n1, c1, n2, c2) {
 }
 
 function pFromZ(z, tails) {
-  return tails * (1 - normalCDF(Math.abs(z)));
+  return Math.max(0, Math.min(1, tails === 1 ? 1 - normalCDF(z) : 2 * (1 - normalCDF(Math.abs(z)))));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +256,7 @@ let chartsDirty = false;
 function recalc() {
   const n1 = v('ctrl-n'), c1 = v('ctrl-c');
   const p1 = n1 > 0 ? c1/n1 : 0;
-  document.getElementById('ctrl-rate').textContent = fmtPct(p1);
+  document.getElementById('ctrl-rate').textContent = n1 > 0 && c1 >= 0 ? fmtPct(p1) : 'Undefined';
 
   const targetConf = parseFloat(document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
   const power      = parseFloat(document.querySelector('input[name="sPower"]:checked')?.value || '0.80');
@@ -263,7 +264,7 @@ function recalc() {
   const alpha      = 1 - targetConf;
   const nVar       = variants.length;
 
-  const adjAlpha = alpha / nVar;
+  const adjAlpha = alpha / Math.max(1, nVar);
   const adjConf  = 1 - adjAlpha;
   const bfEl = document.getElementById('bonferroniAlert');
   if (nVar > 1 && (adjConf - targetConf) > 0.00001) {
@@ -279,43 +280,36 @@ function recalc() {
     bfEl.style.display = 'none';
   }
 
-  let firstUplift = null;
-
-  variants.forEach((vr, idx) => {
+  variants.forEach(vr => {
     const n2 = v(vr.id+'-n'), c2 = v(vr.id+'-c');
     const p2 = n2 > 0 ? c2/n2 : 0;
     const rateEl = document.getElementById(vr.id+'-rate');
-    if (rateEl) rateEl.textContent = fmtPct(p2);
+    if (rateEl) rateEl.textContent = n2 > 0 && c2 >= 0 ? fmtPct(p2) : 'Undefined';
 
     const slot = document.getElementById('result-' + vr.id);
     if (!slot) return;
 
-    if (n1 < 1 || n2 < 1 || c1 < 0 || c2 < 0) {
-      slot.innerHTML = '';
+    if (n1 < 1 || n2 < 1 || c1 < 0 || c2 < 0 || ![n1, n2, c1, c2].every(Number.isInteger) ||
+      ['ctrl-n', 'ctrl-c', vr.id+'-n', vr.id+'-c'].some(id => document.getElementById(id).value === '')) {
+      slot.innerHTML = '<div class="result-card" role="status">Enter whole, non-negative counts and at least one visitor in each group. Rates, uplift, interval and test are unavailable for invalid inputs.</div>';
       return;
     }
 
     const { z, pp, se, count } = zTest(n1, c1, n2, c2);
     const pVal    = pFromZ(z, tails);
-    const conf    = 1 - pVal;
-    const uplift  = p1 > 0 ? (p2-p1)/p1 : 0;
+    const uplift  = p1 > 0 ? (p2-p1)/p1 : NaN;
     const absDiff = p2 - p1;
-
-    if (idx === 0) firstUplift = uplift;
-
-    const isWin  = conf >= adjConf && uplift > 0;
-    const isLoss = conf >= adjConf && uplift < 0;
-    const isNear = !isWin && !isLoss && conf >= adjConf * 0.85;
-    const cardCls = isWin ? 'win' : isLoss ? 'loss' : isNear ? 'inconclusive' : '';
+    const interval = relativeInterval(n1, c1, n2, c2, adjAlpha, tails);
+    const significant = pVal < adjAlpha;
+    const isWin  = significant && absDiff > 0;
+    const isLoss = significant && absDiff < 0;
+    const cardCls = isWin ? 'win' : isLoss ? 'loss' : '';
 
     let badgeCls, badgeTxt;
     if (isWin)       { badgeCls='badge-win';  badgeTxt='✓ Win'; }
     else if (isLoss) { badgeCls='badge-loss'; badgeTxt='✗ Loss'; }
-    else if (isNear) { badgeCls='badge-wait'; badgeTxt='⏳ Almost'; }
-    else             { badgeCls='badge-no';   badgeTxt='— Pending'; }
+    else             { badgeCls='badge-no';   badgeTxt='Not significant'; }
 
-    const confColor = isWin ? 'var(--success-500)' : isLoss ? 'var(--danger-500)' : isNear ? 'var(--warning-500)' : 'var(--text-faint)';
-    const barW = Math.max(0, Math.min(100, conf*100));
     const upCls = uplift > 0 ? 'pos' : uplift < 0 ? 'neg' : 'neu';
     const upSign = uplift > 0 ? '+' : '';
 
@@ -323,8 +317,18 @@ function recalc() {
     <div class="result-card ${cardCls}">
       <div class="rc-head">
         <span class="rc-title">Result</span>
-        <span class="rc-compact" title="Confidence · relative uplift"><span style="color:${confColor}">${fmt(conf*100,2)}%</span><span class="${upCls}">${upSign}${fmt(uplift*100,2)}%</span></span>
+        <span class="rc-compact">p = ${fmt(pVal,4)}</span>
         <span class="badge ${badgeCls}">${badgeTxt}</span>
+      </div>
+
+      <div class="effect-summary" id="effect-${vr.id}">
+        <strong class="${upCls}">Observed uplift: ${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'undefined'}</strong>
+        <strong>${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower confidence bound' : 'confidence interval'}: ${intervalText(interval)}</strong>
+        ${nVar > 1 ? `<span>Bonferroni-adjusted per-comparison level; selected family confidence level ${+(targetConf*100).toFixed(5)}%.</span>` : ''}
+        <span>Absolute conversion-rate difference: ${absDiff > 0 ? '+' : ''}${fmt(absDiff*100,2)} percentage points.</span>
+        <span>${Number.isFinite(uplift) ? `${significant ? 'Statistically significant' : 'Not statistically significant'} — ${tails === 1 ? (significant ? 'the lower bound is above zero.' : 'the lower bound does not rule out zero.') : (significant ? 'the interval excludes zero.' : 'the interval includes zero.')} The uplift is a point estimate; the interval expresses uncertainty about the underlying relative effect.` : 'Relative uplift and its interval are undefined because the control has zero conversions. The absolute difference and test remain available.'}</span>
+        <div class="significance-summary" id="significance-${vr.id}">Observed p-value: <strong>${fmt(pVal,6)}</strong> · significance level α: <strong>${fmt(adjAlpha*100,5)}%</strong> · <strong>${significant ? 'Significant' : 'Not significant'}</strong></div>
+        <span>Not significant does not mean no effect. ${count ? 'Count metric: independent Poisson event rates, not binary conversion probabilities.' : 'Independent binary outcomes assumed.'} Approximate score method; sparse data or boundary rates need caution.</span>
       </div>
 
       <div class="calc-chain">
@@ -362,19 +366,19 @@ function recalc() {
         <div class="cc-divider"></div>
 
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Confidence = 1 − p <button class="help-btn" data-tooltip="In this calculator, confidence is 1 − p-value. ${fmt(conf*100,2)}% means p = ${fmt(pVal,4)}; it is evidence against “no real effect”, not proof the variant is better." onclick="openConcept('confidence')">?</button></span>
-          <span class="cc-val cc-val--result" style="color:${confColor}">${fmt(conf*100,2)}%</span>
+          <span class="cc-key cc-key--result">Selected confidence level <button class="help-btn" data-tooltip="Long-run coverage of newly calculated intervals, not a probability that the variant wins." onclick="openConcept('confidence')">?</button></span>
+          <span class="cc-val cc-val--result">${+(targetConf*100).toFixed(5)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Threshold (Bonferroni) <button class="help-btn" data-tooltip="With ${nVar} variants: ${fmt(alpha*100,3)}% error ÷ ${nVar} = ${fmt(adjAlpha*100,3)}% per variant. Confidence = 100% − ${fmt(adjAlpha*100,3)}% = ${fmt(adjConf*100,3)}%. You have ${fmt(conf*100,2)}%, need ${fmt(adjConf*100,3)}%." onclick="openConcept('bonferroni')">?</button></span>
-          <span class="cc-val cc-val--result">${fmt(adjConf*100,2)}%</span>
+          <span class="cc-key cc-key--result">Significance level α (Bonferroni) <button class="help-btn" data-tooltip="The selected α is divided by the number of comparisons. Compare the observed p-value with this threshold." onclick="openConcept('bonferroni')">?</button></span>
+          <span class="cc-val cc-val--result">${fmt(adjAlpha*100,5)}%</span>
         </div>
 
         <div class="cc-divider"></div>
 
         <div class="cc-step cc-uplift">
           <span class="cc-key cc-key--result">Uplift (relative) <button class="help-btn" data-tooltip="${CONCEPTS.uplift.tooltip}" onclick="openConcept('uplift')">?</button></span>
-          <span class="cc-val cc-val--result ${upCls}">${upSign}${fmt(uplift*100,2)}%</span>
+          <span class="cc-val cc-val--result ${upCls}">${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'Undefined'}</span>
         </div>
         <div class="cc-step cc-uplift">
           <span class="cc-key cc-key--result">Absolute diff.</span>
@@ -382,13 +386,8 @@ function recalc() {
         </div>
       </div>
 
-      <div class="bar-track" style="margin-top:var(--space-4)"><div class="bar-fill" style="width:${barW}%;background:${confColor}"></div></div>
-      <div class="bar-labels"><span>0%</span><span style="color:${confColor};font-weight:700">${fmt(adjConf*100, adjConf*100 >= 99.9 ? 3 : adjConf*100 >= 99 ? 1 : 0)}% threshold</span><span>100%</span></div>
     </div>`;
   });
-
-  const scUpl = document.getElementById('scUplift');
-  if (!scUpl.dataset.manual && firstUplift !== null) scUpl.value = fmt(firstUplift*100, 1);
 
   chartsDirty = true;
   renderCharts();
@@ -416,10 +415,13 @@ function confFromN(n1, n2, p1, p2, tails) {
 // Chance (in %) that a test with n1 / n2 visitors detects the assumed effect
 function powerFromN(n1, n2, p1, p2, alpha, tails) {
   const count = isCountMetric(p1, p2);
-  if (p1 <= 0 || p2 <= 0 || p1 === p2 || (!count && p2 >= 1) || !(n1 > 0) || !(n2 > 0)) return null;
+  if (p1 <= 0 || p2 < 0 || (!count && p2 > 1) || !(n1 > 0) || !(n2 > 0)) return null;
   const se = Math.sqrt(rateVariance(p1, count) / n1 + rateVariance(p2, count) / n2);
   if (!(se > 0)) return null;
-  return normalCDF(Math.abs(p2 - p1) / se - invNorm(1 - alpha / tails)) * 100;
+  const pooled = (p1*n1 + p2*n2)/(n1+n2);
+  const cutoff = invNorm(1 - alpha / tails) * Math.sqrt(rateVariance(pooled, count)*(1/n1+1/n2));
+  const difference = p2 - p1;
+  return 100 * (1 - normalCDF((cutoff - difference)/se) + (tails === 2 ? normalCDF((-cutoff - difference)/se) : 0));
 }
 
 // Smallest (fractional) time unit where a growing metric f reaches target, or null within cap
@@ -451,7 +453,8 @@ function renderCharts() {
   const expectedUplift = (upliftRaw || 0) / 100;
   const power         = parseFloat(document.querySelector('input[name="sPower"]:checked')?.value || '0.80');
   const tails         = parseInt(document.querySelector('input[name="sType"]:checked')?.value || '2');
-  const targetConf    = parseFloat(document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
+  const familyConf    = parseFloat(document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
+  const targetConf    = 1 - (1 - familyConf) / Math.max(1, variants.length);
 
   // Base rate always from control group
   const ctrlN = v('ctrl-n'), ctrlC = v('ctrl-c');
@@ -461,8 +464,8 @@ function renderCharts() {
   // Projections start from the visitors collected so far and continue at the traffic basis:
   // recent daily traffic (deep dive data) or the average since the start.
   // With several variants, the smallest one limits how fast evidence piles up.
-  const varNs = variants.map(vr => v(vr.id + '-n')).filter(n => n > 0);
-  const N1 = ctrlN, N2 = varNs.length ? Math.min(...varNs) : ctrlN;
+  const varNs = variants.map(vr => v(vr.id + '-n'));
+  const N1 = ctrlN, N2 = varNs.length ? Math.min(...varNs) : 0;
   const recent = deepRecentRates();
   let f1, f2, fTotal, basisTxt;
   if (recent) {
@@ -478,6 +481,7 @@ function renderCharts() {
   const totalAt = u => (u <= since ? u * totalVis / since : totalVis + (u - since) * fTotal);
   const confAt = u => confFromN(...nAt(u), p1, p2, tails);
   const powerAt = u => powerFromN(...nAt(u), p1, p2, 1 - targetConf, tails);
+  document.getElementById('currentPower').textContent = powerAt(since) === null ? 'Power unavailable for these assumptions' : `Calculated power: ${fmt(powerAt(since),1)}% for the assumed ${fmt(expectedUplift*100,1)}% relative effect and ${N1.toLocaleString()} / ${N2.toLocaleString()} visitors (control / smallest variant).`;
 
   const hasEffect = p1 > 0 && expectedUplift !== 0;
   const CAP = since + 100000;
@@ -526,7 +530,7 @@ function renderCharts() {
         <span class="scen-stat-val" title="Traffic per time unit used for everything after now">${basisTxt}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Confidence now</span>
+        <span class="scen-stat-label">Projected 1 − p (not confidence)</span>
         <span class="scen-stat-val ${confAtSince >= targetConf*100 ? 'pos' : ''}">${fmt(confAtSince,2)}%</span>
       </div>
       <div class="scen-stat">
@@ -638,7 +642,7 @@ function renderCharts() {
           min: 1,
         },
         y: {
-          title: { display: true, text: 'Confidence (%)', font: { size: 11 } },
+          title: { display: true, text: '1 − p (%) — not confidence', font: { size: 11 } },
           min: 0, max: 100,
           ticks: { font: { size: 10 } }
         }
@@ -665,7 +669,7 @@ function renderCharts() {
     data: {
       datasets: [
         {
-          label: `Confidence (${fmt(expectedUplift*100,1)}% uplift)`,
+          label: `Projected 1 − p (${fmt(expectedUplift*100,1)}% assumed uplift)`,
           data: units.map(u => ({ x: u, y: confAt(u) })),
           borderColor: '#4f78d6',
           backgroundColor: 'rgba(79,120,214,0.08)',
@@ -718,7 +722,7 @@ function renderCharts() {
           min: 1,
         },
         y: {
-          title: { display: true, text: 'Confidence (%)', font: { size: 11 } },
+          title: { display: true, text: '1 − p (%) — not confidence', font: { size: 11 } },
           min: 0, max: 100,
           ticks: { font: { size: 10 } }
         }
@@ -1048,6 +1052,7 @@ function restoreFromParams() {
   if (dz) {
     decodeDeepData(dz)
       .then(data => {
+        if (typeof preserveExampleData === 'function' && preserveExampleData(data, dz)) return;
         setDeepData(data, dz);
         chartsDirty = true;
         renderCharts();

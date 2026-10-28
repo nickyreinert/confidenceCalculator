@@ -58,6 +58,7 @@ function setDeepData(data, encoded) {
     const seq = ++deepEncodeSeq;
     encodeDeepData(deepData).then(s => {
       if (seq !== deepEncodeSeq) return;
+      if (typeof preserveExampleData === 'function' && preserveExampleData(null, s)) return;
       deepEncoded = s;
       if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
       renderDeepInfo();
@@ -330,13 +331,12 @@ function renderDeepCharts() {
       plugins: { legend, tooltip: { callbacks: { label: c => c.raw === null ? null : `${c.dataset.label}: ${fmt(c.raw, 2)}%` } } },
       scales: {
         x: { ticks: xTicks, grid: { display: false } },
-        y: { min: 0, max: 100, title: { display: true, text: 'Confidence (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } },
+        y: { min: 0, max: 100, title: { display: true, text: '1 − p (%) — not confidence', font: { size: 11 } }, ticks: { font: { size: 10 } } },
       },
     },
   });
 
   // Uplift over time: cumulative line + likely range, weekly dots
-  const zBand = invNorm(1 - (1 - targetConf) / 2);
   const showBand = groups.length === 2;
   const upliftSets = [];
   const yValues = [];
@@ -347,11 +347,10 @@ function renderDeepCharts() {
       const n1 = cum[0].n[d], c1 = cum[0].c[d], n2 = cum[gi].n[d], c2 = cum[gi].c[d];
       if (n1 < 1 || n2 < 1 || c1 <= 0) { line.push(null); lo.push(null); hi.push(null); return; }
       const p1 = c1 / n1, p2 = c2 / n2;
-      const count = isCountMetric(p1, p2);
-      const se = Math.sqrt(rateVariance(p1, count) / n1 + rateVariance(p2, count) / n2);
+      const interval = relativeInterval(n1, c1, n2, c2, 1 - adjConf, tails);
       line.push((p2 / p1 - 1) * 100);
-      lo.push(((p2 - p1) - zBand * se) / p1 * 100);
-      hi.push(((p2 - p1) + zBand * se) / p1 * 100);
+      lo.push(interval && Number.isFinite(interval.lower) ? interval.lower * 100 : null);
+      hi.push(interval && Number.isFinite(interval.upper) ? interval.upper * 100 : null);
     });
     yValues.push(...line.filter(v => v !== null));
     if (showBand) {
@@ -443,7 +442,7 @@ function renderBreakdown() {
   const maxVis = Math.max(1, ...rows.map(r => sum(r.n)));
   const head = { weekday: 'Weekday', dom: 'Day', month: 'Month' }[mode];
   const variantsHead = groups.slice(1).map(g =>
-    `<th class="num">${escapeHtml(g.label)} rate</th><th class="num">Uplift</th><th class="num">Conf.</th>`).join('');
+    `<th class="num">${escapeHtml(g.label)} rate</th><th class="num">Uplift</th><th class="num">1 − p (not confidence)</th>`).join('');
 
   el.innerHTML = `
     <table class="bd-table">

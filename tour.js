@@ -20,8 +20,8 @@ const TOUR_STEPS = [
   {
     target: [() => $tour('#confRadios')?.closest('.radio-group')],
     sidebar: true,
-    title: 'Confidence',
-    text: `How sure you want to be before calling a winner. <strong>95%</strong> is the usual choice. Higher means fewer false wins — but you need more visitors.`,
+    title: 'Confidence level',
+    text: `With a <strong>95%</strong> confidence method, about 95 in 100 newly calculated intervals would contain the fixed true effect across repeated experiments. This matches α = 5%, not a 95% probability the variant wins.`,
   },
   {
     target: [() => $tour('#typeRadios')?.closest('.radio-group')],
@@ -38,7 +38,7 @@ const TOUR_STEPS = [
     target: [() => $tour('#powerRadioGroup'), headerToggle('projToggle')],
     sidebar: true,
     title: 'Power — why it matters',
-    text: `The chance your test finds a real effect, if there is one. With <strong>80%</strong> you still miss a real winner 1 in 5 times. Too little power and you stop too early and wrongly call it "no effect".`,
+    text: `IF an effect of the <strong>separately assumed size</strong> really exists, an 80%-powered test detects it in about 80 of 100 comparable experiments. This is not the probability today's result is correct. Not significant does not mean no effect.`,
     hiddenText: ' Turn on <strong>Projection</strong> to set it.',
   },
   {
