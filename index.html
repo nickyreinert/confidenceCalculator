@@ -173,16 +173,6 @@
       With <strong id="bfCount">2</strong> variants, intervals use <strong id="bfAlpha">97.5%</strong> per-comparison coverage for the selected <strong id="bfTargetConf">95%</strong> family confidence level. The matching p-value threshold is α divided by the number of variants. <button class="help-btn" data-tooltip="Bonferroni adjusts both the interval and the test for multiple comparisons." onclick="openConcept('bonferroni')">?</button>
     </div>
 
-    <details class="concept-summary">
-      <summary>Power, significance &amp; confidence intervals</summary>
-      <div class="concept-summary-body">
-      <p><strong>Power:</strong> IF a real effect of the SPECIFIED SIZE exists, 80 out of 100 comparable experiments would detect it at 80% power. This is conditional on an assumed effect, not the probability today's result is correct.</p>
-      <p><strong>Significance level (α):</strong> IF there is NO REAL EFFECT, α = 5% means about 5 out of 100 comparable experiments would falsely report a significant difference. α is chosen; the p-value is observed; p &lt; α gives the decision.</p>
-      <p><strong>Confidence interval:</strong> Repeat the experiment and calculate a NEW interval each time. About 95 out of 100 intervals from a 95% confidence method would contain the TRUE effect, which could be positive, negative, or zero.</p>
-        <p>95% confidence corresponds to α = 5% for matching tests and intervals. It is not a 95% probability the variant wins or the measured uplift will repeat. Coverage concerns different intervals across experiments, not 95% of future results falling inside today's interval.</p>
-        <p>Not significant does not establish no effect. Sufficient power does not establish sufficient calendar duration. Plan full business cycles and a stopping rule in advance; repeatedly checking and stopping at significance invalidates the fixed-sample error rate.</p>
-      </div>
-    </details>
     <div id="exampleBanner" class="alert alert-info" hidden>Example mode · Illustrative data, not a real experiment. <button type="button" class="btn-split" onclick="exitExample()">Exit example mode</button></div>
 
     <!-- Group + result columns grid -->
