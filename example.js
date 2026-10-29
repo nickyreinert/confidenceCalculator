@@ -114,6 +114,29 @@ function exampleGo(direction) {
   showExampleStep();
 }
 
+function updateExampleBackdrop() {
+  const dialog = document.getElementById('exampleDialog');
+  if (!dialog?.open) return;
+  let path = `M0 0H${window.innerWidth}V${window.innerHeight}H0Z`;
+  document.querySelectorAll('.example-highlight').forEach(element => {
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const padding = 8;
+    const left = rect.left - padding, top = rect.top - padding;
+    const right = rect.right + padding, bottom = rect.bottom + padding;
+    const radius = Math.min((parseFloat(getComputedStyle(element).borderRadius) || 0) + padding,
+      (right - left) / 2, (bottom - top) / 2);
+    path += `M${left + radius} ${top}H${right - radius}Q${right} ${top} ${right} ${top + radius}` +
+      `V${bottom - radius}Q${right} ${bottom} ${right - radius} ${bottom}` +
+      `H${left + radius}Q${left} ${bottom} ${left} ${bottom - radius}` +
+      `V${top + radius}Q${left} ${top} ${left + radius} ${top}Z`;
+  });
+  dialog.style.setProperty('--example-backdrop-clip', `path(evenodd, "${path}")`);
+}
+
+window.addEventListener('scroll', updateExampleBackdrop, { capture: true, passive: true });
+window.addEventListener('resize', updateExampleBackdrop);
+
 function showExampleStep() {
   const id = variants[0].id;
   const steps = [
@@ -148,6 +171,7 @@ function showExampleStep() {
   document.getElementById('exampleNext').disabled = exampleState.step === 2;
   document.getElementById('exampleDialog').scrollTop = 0;
   document.getElementById('exampleTitle').focus({ preventScroll: true });
+  updateExampleBackdrop();
 }
 
 function exitExample() {

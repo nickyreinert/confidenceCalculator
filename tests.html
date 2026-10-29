@@ -56,12 +56,18 @@ document.getElementById('calculator').addEventListener('load', async () => {
     doc.getElementById('exampleStart').focus();
     calculator.startExample();
     assert(doc.getElementById('exampleDialog').matches(':modal'), 'Native modal focus containment');
+    const backdropHoles = () => {
+      const clip = calculator.getComputedStyle(doc.getElementById('exampleDialog'), '::backdrop').clipPath;
+      return (clip.match(/[zZ]/g) || []).length - 1;
+    };
+    assert(backdropHoles() === doc.querySelectorAll('.example-highlight').length, 'Modal backdrop leaves every highlighted field undimmed');
     assert(doc.activeElement.id === 'exampleTitle', 'Initial focus moves to dialog title');
     assert(doc.getElementById('scUplift').value === '20' && doc.getElementById('ctrl-c').value === '100', 'Illustrative dataset and separate power assumption');
     assert(calculator.location.href === url, 'Entering example does not overwrite shared URL');
     assert(doc.getElementById('exampleText').textContent.includes('specified real effect'), 'Concise power explanation');
     doc.getElementById('exampleDialog').dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     assert(doc.getElementById('exampleTitle').textContent.startsWith('Significance'), 'Keyboard Next and significance explanation');
+    assert(backdropHoles() === doc.querySelectorAll('.example-highlight').length, 'Backdrop cutouts follow the current example step');
     calculator.exampleGo(1);
     assert(doc.querySelectorAll('.interval-zero').length === 2 && doc.getElementById('exampleContext').textContent.includes('Excludes zero') && doc.getElementById('exampleContext').textContent.includes('Includes zero'), 'Both computed intervals with visible zero markers');
     calculator.exampleGo(-1);
