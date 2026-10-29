@@ -21,8 +21,8 @@ function exampleComparison() {
     const position = value => 50 + value / extent * 50;
     return `<section class="example-comparison">
       <strong>${excludes ? 'Excludes zero' : 'Includes zero'} · ${p < 0.05 ? 'Significant' : 'Not significant'}</strong>
-      <p>Illustrative: control ${data.c1}/${data.n1} (${fmtPct(data.c1/data.n1)}), variant ${data.c2}/${data.n2} (${fmtPct(data.c2/data.n2)}).</p>
-      <p>Observed relative uplift: +${fmt(interval.uplift*100,1)}%<br>95% confidence interval: ${intervalText(interval)}<br>p = ${fmt(p,6)}; α = 5%.</p>
+      <p>Control ${data.c1}/${data.n1} · Variant ${data.c2}/${data.n2}</p>
+      <p>+${fmt(interval.uplift*100,1)}% uplift · p = ${fmt(p,4)}<br>95% CI: ${intervalText(interval)}</p>
       <div class="interval-plot" role="img" aria-label="95% relative uplift confidence interval ${intervalText(interval)}; ${excludes ? 'excludes' : 'includes'} zero">
         <span class="interval-zero">0%</span>
         <span class="interval-range" style="left:${position(interval.lower)}%;width:${position(interval.upper)-position(interval.lower)}%"></span>
@@ -118,20 +118,20 @@ function showExampleStep() {
   const id = variants[0].id;
   const steps = [
     {
-      title: 'Power — Would we detect an effect that matters?',
-      text: '<p>IF a real effect of the SPECIFIED SIZE exists, 80 out of 100 comparable experiments would detect it as statistically significant at 80% power.</p><p>Here the separately assumed relevant effect is +20% relative uplift: a 10% baseline would become 12%. The observed uplift is not the power assumption. The calculated power below uses 1,000 visitors per group and α = 5%. The selected 80% is a target, not a claim that this sample has already reached it.</p><p>Power is not the probability this result is correct. Adequate power does not establish sufficient calendar duration or justify repeated checking and stopping at significance.</p>',
+      title: 'Power',
+      text: '<p>80% power means detecting a specified real effect in 80 of 100 comparable tests. It is not the probability a result is correct.</p>',
       selectors: ['#scUplift', '#ctrl-n', '#' + id + '-n', '#currentPower'],
       context: `<strong>Assumed effect: +20% · Visitors: 1,000 / 1,000</strong><p>${document.getElementById('currentPower').textContent}</p>`
     },
     {
-      title: 'Significance — Do we have evidence against zero effect?',
-      text: '<p>IF there is NO REAL EFFECT, a 5% significance level means about 5 out of 100 comparable experiments would falsely report a statistically significant difference.</p><p>α = 5% is the chosen threshold. The p-value comes from the data. A p-value below α gives a significant decision: evidence against zero effect, not proof. Not significant does not establish no effect.</p>',
+      title: 'Significance',
+      text: '<p>p &lt; α: significant. At α = 5%, about 5 in 100 preplanned tests report a false positive when no effect exists. Not significant does not mean no effect.</p>',
       selectors: ['#confRadios', '#significance-' + id],
-      context: document.getElementById('significance-' + id).innerHTML
+      context: `<strong>p = ${fmt(pFromZ(zTest(1000, 100, 1000, 112).z, 2),4)} · α = 5%</strong><p>Not significant</p>`
     },
     {
-      title: 'Confidence interval — How precisely have we estimated the effect?',
-      text: '<p>Repeat the experiment and calculate a NEW interval each time. About 95 out of 100 intervals constructed using a 95% confidence method would contain the TRUE effect, which could be positive, negative, or zero.</p><p>A single uplift is a point estimate, not a guaranteed or repeatable outcome. 95% confidence corresponds to α = 5% here. It is not a 95% probability the variant wins or the measured uplift will repeat, nor does it mean 95% of future results fall inside today’s interval.</p><p>These are two different illustrative datasets, not repeated experiments with a changing “true effect”. Both intervals and decisions are calculated from the counts.</p>',
+      title: 'Confidence interval',
+      text: '<p>A 95% method covers the true effect in about 95 of 100 repeated experiments, not a 95% chance of winning. Below: two separate datasets; one interval crosses zero, one does not.</p>',
       selectors: ['#effect-' + id],
       context: exampleComparison()
     }

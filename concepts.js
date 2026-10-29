@@ -16,6 +16,17 @@ const CONCEPTS = {
       </ul>
     `
   },
+  interval: {
+    label: 'Uplift confidence interval',
+    tooltip: 'Uncertainty around relative uplift. Zero means no change; an interval crossing zero is not significant.',
+    deep: `
+      <p>The point estimate is the observed relative uplift. The interval describes its uncertainty, not a guaranteed range for future results.</p>
+      <p>A two-sided interval excluding zero matches a significant result. A one-sided increase test shows a lower bound with no upper limit. Not significant does not mean no effect.</p>
+      <p>Across repeated experiments, a 95% method produces intervals containing the true effect about 95% of the time. This is not a 95% probability the variant wins.</p>
+      <p>With multiple variants, the displayed level is Bonferroni-adjusted per comparison; the selected level applies to the family. Zero control conversions make relative uplift and its interval undefined; the absolute difference and test remain available.</p>
+      <p>The score approximation assumes independent binary outcomes, or independent Poisson event rates for count metrics. Sparse samples, boundary rates and correlated observations need caution.</p>
+    `
+  },
   pvalue: {
     label: 'p-value',
     tooltip: 'How compatible your observed data is with “no real effect”. Lower p-value means stronger evidence against the null hypothesis.',

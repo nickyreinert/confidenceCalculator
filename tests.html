@@ -59,7 +59,7 @@ document.getElementById('calculator').addEventListener('load', () => {
     assert(doc.activeElement.id === 'exampleTitle', 'Initial focus moves to dialog title');
     assert(doc.getElementById('scUplift').value === '20' && doc.getElementById('ctrl-c').value === '100', 'Illustrative dataset and separate power assumption');
     assert(calculator.location.href === url, 'Entering example does not overwrite shared URL');
-    assert(doc.getElementById('exampleText').textContent.includes('SPECIFIED SIZE'), 'Power explanation');
+    assert(doc.getElementById('exampleText').textContent.includes('specified real effect'), 'Concise power explanation');
     doc.getElementById('exampleDialog').dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     assert(doc.getElementById('exampleTitle').textContent.startsWith('Significance'), 'Keyboard Next and significance explanation');
     calculator.exampleGo(1);
@@ -86,6 +86,10 @@ document.getElementById('calculator').addEventListener('load', () => {
     assert(doc.getElementById('scUplift').value === assumed, 'Observed uplift never overwrites power effect');
     calculator.setCalcMode('off');
     assert(calculator.getComputedStyle(doc.getElementById('effect-v0')).display !== 'none', 'Uplift and interval visible with calculation details off');
+    assert(doc.querySelectorAll('#effect-v0 .effect-metric').length === 2 && !doc.querySelector('#effect-v0 > span'), 'Two compact metrics without inline explanation');
+    doc.querySelector('#effect-v0 button[aria-label="About the confidence interval"]').click();
+    assert(doc.getElementById('sidebarLabel').textContent === 'Uplift confidence interval' && doc.getElementById('conceptSidebar').classList.contains('is-open'), 'Interval help opens common concept sidebar');
+    calculator.closeSidebar();
     doc.getElementById('ctrl-c').value = 0;
     calculator.recalc();
     assert(doc.getElementById('effect-v0').textContent.includes('undefined'), 'Zero control conversions visibly undefined');

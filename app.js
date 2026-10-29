@@ -322,13 +322,14 @@ function recalc() {
       </div>
 
       <div class="effect-summary" id="effect-${vr.id}">
-        <strong class="${upCls}">Observed uplift: ${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'undefined'}</strong>
-        <strong>${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower confidence bound' : 'confidence interval'}: ${intervalText(interval)}</strong>
-        ${nVar > 1 ? `<span>Bonferroni-adjusted per-comparison level; selected family confidence level ${+(targetConf*100).toFixed(5)}%.</span>` : ''}
-        <span>Absolute conversion-rate difference: ${absDiff > 0 ? '+' : ''}${fmt(absDiff*100,2)} percentage points.</span>
-        <span>${Number.isFinite(uplift) ? `${significant ? 'Statistically significant' : 'Not statistically significant'} — ${tails === 1 ? (significant ? 'the lower bound is above zero.' : 'the lower bound does not rule out zero.') : (significant ? 'the interval excludes zero.' : 'the interval includes zero.')} The uplift is a point estimate; the interval expresses uncertainty about the underlying relative effect.` : 'Relative uplift and its interval are undefined because the control has zero conversions. The absolute difference and test remain available.'}</span>
-        <div class="significance-summary" id="significance-${vr.id}">Observed p-value: <strong>${fmt(pVal,6)}</strong> · significance level α: <strong>${fmt(adjAlpha*100,5)}%</strong> · <strong>${significant ? 'Significant' : 'Not significant'}</strong></div>
-        <span>Not significant does not mean no effect. ${count ? 'Count metric: independent Poisson event rates, not binary conversion probabilities.' : 'Independent binary outcomes assumed.'} Approximate score method; sparse data or boundary rates need caution.</span>
+        <div class="effect-metric">
+          <span class="effect-label">Uplift <button type="button" class="help-btn" aria-label="About relative uplift" data-tooltip="${CONCEPTS.uplift.tooltip}" onclick="openConcept('uplift')">?</button></span>
+          <strong class="effect-value ${upCls}">${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'undefined'}</strong>
+        </div>
+        <div class="effect-metric">
+          <span class="effect-label">${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'lower bound' : 'CI'}${nVar > 1 ? ' · Bonferroni' : ''} <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${CONCEPTS.interval.tooltip}" onclick="openConcept('interval')">?</button></span>
+          <strong class="effect-value effect-interval">${Number.isFinite(uplift) ? intervalText(interval) : 'undefined'}</strong>
+        </div>
       </div>
 
       <div class="calc-chain">
@@ -358,7 +359,7 @@ function recalc() {
           <span class="cc-key cc-key--out">Z = (p₂−p₁) / SE <button class="help-btn" data-tooltip="${CONCEPTS.zscore.tooltip}" onclick="openConcept('zscore')">?</button></span>
           <span class="cc-val cc-val--out">${fmt(z,4)}</span>
         </div>
-        <div class="cc-step cc-out">
+        <div class="cc-step cc-out" id="significance-${vr.id}">
           <span class="cc-key cc-key--out">p-value (${tails===2?'two':'one'}-tailed) <button class="help-btn" data-tooltip="${CONCEPTS.pvalue.tooltip}" onclick="openConcept('pvalue')">?</button></span>
           <span class="cc-val cc-val--out">${fmt(pVal,4)}</span>
         </div>
@@ -370,16 +371,12 @@ function recalc() {
           <span class="cc-val cc-val--result">${+(targetConf*100).toFixed(5)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Significance level α (Bonferroni) <button class="help-btn" data-tooltip="The selected α is divided by the number of comparisons. Compare the observed p-value with this threshold." onclick="openConcept('bonferroni')">?</button></span>
+          <span class="cc-key cc-key--result">α${nVar > 1 ? ' (Bonferroni)' : ''} <button class="help-btn" data-tooltip="The selected α is divided by the number of comparisons. Compare the observed p-value with this threshold." onclick="openConcept('bonferroni')">?</button></span>
           <span class="cc-val cc-val--result">${fmt(adjAlpha*100,5)}%</span>
         </div>
 
         <div class="cc-divider"></div>
 
-        <div class="cc-step cc-uplift">
-          <span class="cc-key cc-key--result">Uplift (relative) <button class="help-btn" data-tooltip="${CONCEPTS.uplift.tooltip}" onclick="openConcept('uplift')">?</button></span>
-          <span class="cc-val cc-val--result ${upCls}">${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'Undefined'}</span>
-        </div>
         <div class="cc-step cc-uplift">
           <span class="cc-key cc-key--result">Absolute diff.</span>
           <span class="cc-val cc-val--result ${upCls}">${upSign}${fmt(absDiff*100,2)} pp</span>
