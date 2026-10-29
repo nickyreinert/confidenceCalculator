@@ -7,7 +7,7 @@
 <pre id="results" role="status">Running...</pre>
 <iframe id="calculator" title="Calculator under test" style="width:100%;height:800px" src="index.html?vis=2400&amp;conf=0.95&amp;pwr=0.80&amp;type=2&amp;cd=33&amp;cn=800&amp;cc=80&amp;since=14&amp;scupl=20&amp;calc=off&amp;proj=0&amp;sb=1&amp;dd=0&amp;nv=2&amp;vd0=38&amp;vn0=900&amp;vc0=100&amp;vd1=29&amp;vn1=700&amp;vc1=90"></iframe>
 <script>
-document.getElementById('calculator').addEventListener('load', () => {
+document.getElementById('calculator').addEventListener('load', async () => {
   const frame = document.getElementById('calculator');
   const calculator = frame.contentWindow;
   const results = [];
@@ -87,6 +87,19 @@ document.getElementById('calculator').addEventListener('load', () => {
     calculator.setCalcMode('off');
     assert(calculator.getComputedStyle(doc.getElementById('effect-v0')).display !== 'none', 'Uplift and interval visible with calculation details off');
     assert(doc.querySelectorAll('#effect-v0 .effect-metric').length === 2 && !doc.querySelector('#effect-v0 > span'), 'Two compact metrics without inline explanation');
+    assert(doc.querySelector('#effect-v0 .effect-axis-zero').textContent === '0%' && doc.querySelector('#effect-v0 .effect-axis-point'), 'Interval is a number line with zero and point estimate');
+    assert(doc.querySelectorAll('#effect-v0 .effect-label')[1].textContent.trim() === 'Interval ?', 'Interval label does not repeat confidence level');
+    const axisProbe = doc.createElement('div');
+    for (const bounds of [interval, significant, zero, oneSided, { lower: 0, upper: 0, uplift: 0 }]) {
+      axisProbe.innerHTML = calculator.renderEffectInterval(bounds);
+      const axis = axisProbe.querySelector('.effect-axis');
+      assert(axis && !/NaN|Infinity/.test(axis.getAttribute('style')) && parseFloat(axis.style.getPropertyValue('--estimate')) >= 8 && parseFloat(axis.style.getPropertyValue('--estimate')) <= 96, 'Finite number-line geometry for interval boundary case');
+    }
+    assert(axisProbe.querySelector('.effect-axis'), 'Zero-width interval renders');
+    axisProbe.innerHTML = calculator.renderEffectInterval(oneSided);
+    assert(axisProbe.querySelector('.effect-axis--open') && axisProbe.textContent.includes('∞'), 'One-sided interval has an open-ended arrow');
+    axisProbe.innerHTML = calculator.renderEffectInterval({ uplift: null, lower: null, upper: null });
+    assert(!axisProbe.querySelector('.effect-axis'), 'Undefined interval does not draw a misleading line');
     doc.querySelector('#effect-v0 button[aria-label="About the confidence interval"]').click();
     assert(doc.getElementById('sidebarLabel').textContent === 'Uplift confidence interval' && doc.getElementById('conceptSidebar').classList.contains('is-open'), 'Interval help opens common concept sidebar');
     calculator.closeSidebar();
@@ -99,7 +112,30 @@ document.getElementById('calculator').addEventListener('load', () => {
     assert(doc.getElementById('currentPower').textContent.includes('unavailable'), 'Zero-visitor variant is not omitted from power calculation');
     doc.getElementById('ctrl-n').value = 0;
     calculator.recalc();
-    assert(doc.getElementById('result-v0').textContent.includes('at least one visitor'), 'Zero visitors visibly invalid');
+    assert(doc.getElementById('result-v0').textContent.trim() === 'Check inputs?', 'Invalid counts show a short status, not explanatory prose');
+    doc.querySelector('#result-v0 button').click();
+    assert(doc.getElementById('sidebarLabel').textContent === 'Input requirements', 'Input requirements available behind help');
+    calculator.closeSidebar();
+    calculator.toggleProjection(true, true);
+    assert(!doc.getElementById('secProjection').classList.contains('proj-hidden'), 'Projection toggle shows the whole section');
+    calculator.toggleProjection(false, true);
+    assert(doc.getElementById('secProjection').classList.contains('proj-hidden'), 'Projection toggle hides the whole section');
+    const defaultsFrame = document.createElement('iframe');
+    defaultsFrame.hidden = true;
+    const defaultsLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
+    defaultsFrame.src = 'index.html';
+    document.body.append(defaultsFrame);
+    await defaultsLoaded;
+    const defaults = defaultsFrame.contentDocument;
+    assert(defaults.getElementById('calcToggle').dataset.state === 'off' && defaults.getElementById('groupsGrid').classList.contains('calc-collapsed'), 'Fresh start uses the simplest calculator');
+    assert(!defaults.getElementById('projToggle').checked && !defaults.getElementById('deepToggle').checked && defaults.getElementById('secProjection').classList.contains('proj-hidden') && defaults.getElementById('projectionSidebar').classList.contains('proj-hidden'), 'Fresh start hides projection, planning inputs and deep dive');
+    assert(defaults.querySelectorAll('.group-col:not(.group-col--add)').length === 2, 'Fresh start contains only control and one variant');
+    const sharedLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
+    defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1';
+    await sharedLoaded;
+    const shared = defaultsFrame.contentDocument;
+    assert(shared.getElementById('calcToggle').dataset.state === 'full' && shared.getElementById('projToggle').checked && shared.getElementById('deepToggle').checked && !shared.getElementById('secProjection').classList.contains('proj-hidden'), 'Explicit shared options override simple starting defaults');
+    defaultsFrame.remove();
     results.push('All checks passed.');
     document.documentElement.dataset.tests = 'passed';
   } catch (error) {

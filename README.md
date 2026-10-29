@@ -2,6 +2,8 @@
 
 Compare A/B test results, see how each version is doing, and plan what to test next.
 
+New sessions start with one control and one variant, calculation details off, and projection and deep dive hidden. Shared links retain their explicit settings. Uplift intervals use a number line with a zero marker, observed-effect point and endpoint labels; explanations are available through the `?` buttons.
+
 [**Open the calculator →**](https://confidence.nickyreinert.de)
 
 ![The calculator comparing a control with a variant](assets/confidence-calculator.jpg)

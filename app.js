@@ -251,6 +251,25 @@ function v(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 function fmt(n, d=2) { return isFinite(n) ? n.toFixed(d) : '—'; }
 function fmtPct(n) { return fmt(n*100,2)+'%'; }
 
+function renderEffectInterval(interval) {
+  if (!interval || interval.uplift === null) return '<span class="effect-unavailable" aria-label="Interval undefined" data-tooltip="Relative uplift needs at least one control conversion.">—</span>';
+  const { lower, upper, uplift } = interval;
+  const open = !Number.isFinite(upper);
+  const minimum = Math.min(0, lower, uplift);
+  const maximum = Math.max(0, open ? uplift : upper);
+  const span = Math.max(maximum - minimum, 0.01);
+  const position = value => 8 + (value - minimum) / span * 84;
+  const lowerPosition = position(lower);
+  const upperPosition = open ? 96 : position(upper);
+  const endpoint = value => `${value > 0 ? '+' : ''}${fmt(value * 100, 2)}%`;
+  return `<div class="effect-axis${open ? ' effect-axis--open' : ''}" role="img" aria-label="Relative uplift ${endpoint(uplift)}; interval ${intervalText(interval)}" style="--zero:${position(0)}%;--lower:${lowerPosition}%;--range:${upperPosition - lowerPosition}%;--estimate:${position(uplift)}%">
+    <span class="effect-axis-zero" aria-hidden="true">0%</span>
+    <span class="effect-axis-range" aria-hidden="true"></span>
+    <span class="effect-axis-point" aria-hidden="true"></span>
+    <span class="effect-axis-labels" aria-hidden="true"><span>${endpoint(lower)}</span><span>${open ? '∞' : endpoint(upper)}</span></span>
+  </div>`;
+}
+
 let chartsDirty = false;
 
 function recalc() {
@@ -291,7 +310,7 @@ function recalc() {
 
     if (n1 < 1 || n2 < 1 || c1 < 0 || c2 < 0 || ![n1, n2, c1, c2].every(Number.isInteger) ||
       ['ctrl-n', 'ctrl-c', vr.id+'-n', vr.id+'-c'].some(id => document.getElementById(id).value === '')) {
-      slot.innerHTML = '<div class="result-card" role="status">Enter whole, non-negative counts and at least one visitor in each group. Rates, uplift, interval and test are unavailable for invalid inputs.</div>';
+      slot.innerHTML = `<div class="result-card result-invalid" role="status"><span>Check inputs</span><button type="button" class="help-btn" aria-label="Input requirements" data-tooltip="${CONCEPTS.inputs.tooltip}" onclick="openConcept('inputs')">?</button></div>`;
       return;
     }
 
@@ -327,8 +346,8 @@ function recalc() {
           <strong class="effect-value ${upCls}">${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'undefined'}</strong>
         </div>
         <div class="effect-metric">
-          <span class="effect-label">${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'lower bound' : 'CI'}${nVar > 1 ? ' · Bonferroni' : ''} <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${CONCEPTS.interval.tooltip}" onclick="openConcept('interval')">?</button></span>
-          <strong class="effect-value effect-interval">${Number.isFinite(uplift) ? intervalText(interval) : 'undefined'}</strong>
+          <span class="effect-label">Interval <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower bound' : 'confidence interval'}${nVar > 1 ? ' (Bonferroni-adjusted)' : ''}. ${CONCEPTS.interval.tooltip}" onclick="openConcept('interval')">?</button></span>
+          ${renderEffectInterval(interval)}
         </div>
       </div>
 
@@ -955,7 +974,7 @@ function buildStateParams() {
   if (start) p.set('start', start);
   p.set('scupl', document.getElementById('scUplift').value);
   p.set('theme', document.documentElement.getAttribute('data-theme') || 'light');
-  p.set('calc',  document.getElementById('calcToggle')?.dataset.state || 'full');
+  p.set('calc',  document.getElementById('calcToggle')?.dataset.state || 'off');
   p.set('proj',  document.getElementById('projToggle')?.checked ? '1' : '0');
   p.set('sb',    document.querySelector('.dashboard')?.classList.contains('sidebar-collapsed') ? '1' : '0');
   p.set('dd',    deepEnabled() ? '1' : '0');
@@ -1092,6 +1111,7 @@ function copyChart(chartId) {
 
 function toggleProjection(show, skipHistory) {
   const hidden = !show;
+  document.getElementById('secProjection')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerChartsRow')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerRadioGroup')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('projectionSidebarLabel')?.classList.toggle('proj-hidden', hidden);
@@ -1106,7 +1126,7 @@ const CALC_MODES = ['off', 'on', 'full'];
 const CALC_MODE_LABELS = { off: 'Off', on: 'On', full: 'Full' };
 
 function setCalcMode(mode, skipHistory) {
-  if (!CALC_MODES.includes(mode)) mode = 'full';
+  if (!CALC_MODES.includes(mode)) mode = 'off';
   const group = document.getElementById('calcToggle');
   group.dataset.state = mode;
   const radio = group.querySelector(`input[value="${mode}"]`);
@@ -1203,6 +1223,8 @@ document.getElementById('jumpNav').addEventListener('click', e => {
 window.addEventListener('scroll', highlightJumpNav, { passive: true });
 
 // Boot: restore from URL or render defaults
+setCalcMode(document.getElementById('calcToggle').dataset.state, true);
+toggleProjection(document.getElementById('projToggle').checked, true);
 if (!restoreFromParams()) {
   addVariant();
   document.getElementById('v0-c').value = 280;

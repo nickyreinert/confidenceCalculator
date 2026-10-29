@@ -20,18 +20,18 @@
       <p>A/B testing made easy — by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
     </div>
     <div class="header-actions">
-      <div class="calc-toggle calc-toggle--tri" id="calcToggle" data-state="full" role="radiogroup" aria-label="Calculation details">
+      <div class="calc-toggle calc-toggle--tri" id="calcToggle" data-state="off" role="radiogroup" aria-label="Calculation details">
         <span class="calc-toggle-track">
           <span class="calc-toggle-thumb"></span>
-          <label class="tri-zone" title="Off — one-line result"><input type="radio" name="calcMode" value="off" onchange="setCalcMode(this.value)" aria-label="Off — one-line result"></label>
+          <label class="tri-zone" title="Off — one-line result"><input type="radio" name="calcMode" value="off" checked onchange="setCalcMode(this.value)" aria-label="Off — one-line result"></label>
           <label class="tri-zone" title="On — result summary"><input type="radio" name="calcMode" value="on" onchange="setCalcMode(this.value)" aria-label="On — result summary"></label>
-          <label class="tri-zone" title="Full — summary + calculation steps"><input type="radio" name="calcMode" value="full" checked onchange="setCalcMode(this.value)" aria-label="Full — summary and calculation steps"></label>
+          <label class="tri-zone" title="Full — summary + calculation steps"><input type="radio" name="calcMode" value="full" onchange="setCalcMode(this.value)" aria-label="Full — summary and calculation steps"></label>
         </span>
         <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 4H6l6 7-6 7h12"/></svg>
-        <span class="calc-toggle-label" aria-hidden="true">Calc · <span class="calc-toggle-state" id="calcToggleState">Full</span></span>
+        <span class="calc-toggle-label" aria-hidden="true">Calc · <span class="calc-toggle-state" id="calcToggleState">Off</span></span>
       </div>
       <label class="calc-toggle" aria-label="Show projection charts" title="Show / hide projection charts">
-        <input type="checkbox" id="projToggle" checked onchange="toggleProjection(this.checked)">
+        <input type="checkbox" id="projToggle" onchange="toggleProjection(this.checked)">
         <span class="calc-toggle-track">
           <span class="calc-toggle-thumb"></span>
         </span>
@@ -116,8 +116,8 @@
       </div>
       
       <!-- Projection inputs -->
-      <div id="projectionSidebarLabel" class="sidebar-section-label">Projection</div>
-      <div class="radio-group" id="powerRadioGroup">
+      <div id="projectionSidebarLabel" class="sidebar-section-label proj-hidden">Projection</div>
+      <div class="radio-group proj-hidden" id="powerRadioGroup">
         <span class="radio-label">Target power <button class="help-btn" data-tooltip="IF a real effect of the separately assumed size exists, 80% power detects it in about 80 of 100 comparable experiments. This is a planning target, not the probability the observed result is correct." onclick="openConcept('power')">?</button></span>
         <div class="radio-pills" id="powerRadios">
           <label class="radio-pill"><input type="radio" name="sPower" value="0.80" checked onchange="recalc()"><span>80%</span></label>
@@ -125,7 +125,7 @@
         </div>
       </div>
     </div>
-    <div id="projectionSidebar" class="sidebar-projection">
+    <div id="projectionSidebar" class="sidebar-projection proj-hidden">
       <div class="fg">
         <label for="scSince">Running since</label>
         <div class="since-row">
@@ -176,7 +176,7 @@
     <div id="exampleBanner" class="alert alert-info" hidden>Example mode · Illustrative data, not a real experiment. <button type="button" class="btn-split" onclick="exitExample()">Exit example mode</button></div>
 
     <!-- Group + result columns grid -->
-    <div class="groups-grid" id="groupsGrid">
+    <div class="groups-grid calc-hidden calc-collapsed" id="groupsGrid">
 
       <!-- Control column: same structure as variant columns so fields align row by row -->
       <div class="group-col" id="col-ctrl">
@@ -222,7 +222,7 @@
     </div>
 
     <!-- Projection section -->
-    <section class="section projection-section" id="secProjection">
+    <section class="section projection-section proj-hidden" id="secProjection">
       <div class="scen-stat-row" id="scenStatRow"></div>
       <div class="proj-charts-row">
         <div class="chart-box">

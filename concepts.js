@@ -16,6 +16,11 @@ const CONCEPTS = {
       </ul>
     `
   },
+  inputs: {
+    label: 'Input requirements',
+    tooltip: 'Use whole, non-negative counts and at least one visitor per group.',
+    deep: `<p>Use whole, non-negative counts and at least one visitor in each group. Complete all visitor and conversion fields before calculating a result.</p><p>Conversions may exceed visitors for count metrics; these use a Poisson event-rate model.</p>`
+  },
   interval: {
     label: 'Uplift confidence interval',
     tooltip: 'Uncertainty around relative uplift. Zero means no change; an interval crossing zero is not significant.',
