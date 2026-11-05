@@ -232,7 +232,7 @@ header p {
   color:var(--accent-300);
 }
 
-/* Three-state variant (Calc: off / on / full) — each third of the track is a click target */
+/* Three-state variant (Calc: off / on / full) - each third of the track is a click target */
 .calc-toggle--tri{cursor:default}
 .calc-toggle--tri .calc-toggle-track{width:64px}
 .calc-toggle--tri .calc-toggle-thumb{z-index:1}
@@ -580,6 +580,7 @@ header p {
 
 /* ── Radio groups (now in sidebar) ── */
 .radio-group{display:flex;flex-direction:column;gap:var(--space-2)}
+.conf-alpha-hint{font-size:var(--text-xs);color:var(--text-faint)}
 .radio-label {
   font-family:var(--font-mono);font-size:var(--text-2xs);
   font-weight:var(--fw-medium);letter-spacing:var(--ls-wider);
@@ -786,7 +787,7 @@ header p {
   display:none;
 }
 
-/* Collapsed mode (Calc: off): single line — confidence, uplift, badge */
+/* Collapsed mode (Calc: off): single line - confidence, uplift, badge */
 .rc-compact{display:none}
 .groups-grid.calc-collapsed .result-card{padding:var(--space-3) var(--space-4)}
 .groups-grid.calc-collapsed .rc-head{margin-bottom:0}
@@ -800,13 +801,13 @@ header p {
   font-family:var(--font-mono);font-size:var(--text-sm);font-weight:var(--fw-bold);
 }
 
-/* Mid-tier steps — pooled rate, SE formula */
+/* Mid-tier steps - pooled rate, SE formula */
 .cc-mid .cc-key,.cc-mid .cc-val{color:var(--text-faint);opacity:.7}
 
-/* Output steps — z, p-value */
+/* Output steps - z, p-value */
 .cc-key--out,.cc-val--out{color:var(--text-muted) !important;opacity:1;font-weight:var(--fw-medium)}
 
-/* Result steps — confidence, threshold, uplift */
+/* Result steps - confidence, threshold, uplift */
 .cc-key--result{color:var(--text-body) !important;font-weight:var(--fw-semibold)}
 .cc-val--result{color:var(--text-strong) !important;font-weight:var(--fw-bold);font-size:var(--text-xs)}
 
@@ -837,29 +838,8 @@ header p {
 .effect-value.neg{color:#a73535!important}
 [data-theme="dark"] .effect-value.pos{color:#83d9b2!important}
 [data-theme="dark"] .effect-value.neg{color:#ffaaaa!important}
-.example-highlight{outline:3px solid #b75a00!important;outline-offset:4px;background:var(--surface-raised)!important}
-.example-dialog{--text-strong:#352814;--text-body:#49371e;--text-muted:#624b2b;--surface-raised:#fff8e8;--border-hair:#d8b576;--accent-strong:#854000;position:fixed;inset:auto 16px 16px auto;width:460px;max-width:calc(100% - 32px);max-height:85dvh;overflow:auto;padding:var(--space-5);border:2px solid #b75a00;border-radius:8px;background:var(--surface-raised);color:var(--text-body);box-shadow:0 12px 40px rgba(0,0,0,.25);font-family:var(--font-sans);letter-spacing:0;color-scheme:light}
-.example-dialog::backdrop{background:rgba(0,0,0,.28);clip-path:var(--example-backdrop-clip,none)}
-.example-dialog .tour-count{color:#624b2b}
-.example-dialog .import-btn{color:#49371e;background:#fff8e8;box-shadow:none;border:1px solid #997139;letter-spacing:0}
-.example-dialog .import-btn--primary{color:#fff;background:#854000;border-color:#854000}
-.example-dialog .tour-title{font-size:var(--text-md);line-height:var(--lh-normal);margin-block:var(--space-3);letter-spacing:0;overflow-wrap:anywhere}
-.example-dialog .tour-text p+p{margin-top:var(--space-3)}
-.example-dialog .tour-actions{display:flex;flex-wrap:wrap;gap:var(--space-2);position:sticky;bottom:0;background:var(--surface-raised);padding-top:var(--space-3)}
-.example-dialog button:disabled{opacity:.5;cursor:default}
-.example-dialog :focus-visible{outline:3px solid var(--accent-strong);outline-offset:3px}
-.example-context{border-top:1px solid var(--border-hair);padding-top:var(--space-3);margin-top:var(--space-4);font-size:var(--text-sm);line-height:var(--lh-relaxed);overflow-wrap:anywhere}
-.example-comparison+.example-comparison{border-top:1px solid var(--border-hair);padding-top:var(--space-3);margin-top:var(--space-3)}
-.example-comparison p{margin-block:var(--space-2)}
-.interval-plot{position:relative;height:48px;margin-block:var(--space-3)}
-.interval-plot::before{content:'';position:absolute;left:0;right:0;top:24px;border-top:1px solid var(--border-hair)}
-.interval-zero{position:absolute;left:50%;height:44px;border-left:2px dashed var(--text-strong);padding-left:4px;font-family:var(--font-mono);font-size:var(--text-xs)}
-.interval-range{position:absolute;top:22px;height:5px;background:var(--accent-strong)}
-.interval-estimate{position:absolute;top:17px;width:3px;height:15px;background:var(--success-500)}
 [hidden]{display:none!important}
 @media(max-width:600px){
-  .example-dialog{inset:auto 8px 8px;width:calc(100% - 16px);max-width:none;max-height:80dvh;padding:var(--space-4)}
-  .example-dialog .tour-actions button{flex:1 1 auto;min-height:44px;white-space:normal}
   .effect-value{font-size:var(--text-md)}
 }
 

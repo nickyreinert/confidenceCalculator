@@ -64,7 +64,7 @@ function splitTable(text) {
   return lines.map(l => splitDelimitedLine(l, delim));
 }
 
-// Workspace prefixes rows with "1.", "2." … — those are row numbers, not data
+// Workspace prefixes rows with "1.", "2." … - those are row numbers, not data
 const isRowIndexCell = c => /^\d+\.$/.test(c.trim());
 const isTotalLabel   = l => /^(total|totals|gesamt|summe|sum)\b|^(target\s+)?(experiences|activities)$/i.test(l.trim());
 
@@ -203,7 +203,7 @@ function analyzeDailyImport(parsed) {
 
   const dates = [...new Set(dated.map(r => r.date))].sort();
   const spanDays = Math.round((new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000) + 1;
-  if (spanDays > 3660) return { rows: [], columns: [], error: 'Dates span more than 10 years — check the date column.' };
+  if (spanDays > 3660) return { rows: [], columns: [], error: 'Dates span more than 10 years - check the date column.' };
 
   return {
     rows,
@@ -320,10 +320,10 @@ function renderImportPreview() {
   status.className = 'import-status' + (sameCol ? ' import-status--err' : msgs.length ? ' import-status--warn' : ' import-status--ok');
   const daily = importModel.daily;
   const dailyTxt = daily
-    ? ` Daily data: ${daily.spanDays} days (${fmtShortDate(daily.from)} – ${fmtShortDate(daily.to)}) — opens the Deep dive.`
+    ? ` Daily data: ${daily.spanDays} days (${fmtShortDate(daily.from)} - ${fmtShortDate(daily.to)}) - opens the Deep dive.`
       + (importModel.rows.some(r => r.fromTotal) ? ' Card totals come from the total rows.' : '')
     : '';
-  status.textContent = (msgs.length ? msgs.join(' ') : `${used.length} groups detected — check the mapping, then apply.`) + dailyTxt;
+  status.textContent = (msgs.length ? msgs.join(' ') : `${used.length} groups detected - check the mapping, then apply.`) + dailyTxt;
 
   const fmtInt = n => n.toLocaleString();
   preview.innerHTML = `
@@ -335,7 +335,7 @@ function renderImportPreview() {
           <td>${i === 0 ? '<strong>Control</strong>' : i < IMPORT_MAX_GROUPS ? `Variant ${String.fromCharCode(64 + i)}` : 'skipped'}</td>
           <td class="num">${fmtInt(g.n)}</td>
           <td class="num">${fmtInt(g.c)}</td>
-          <td class="num">${g.n > 0 ? (g.c / g.n * 100).toFixed(2) + '%' : '—'}</td>
+          <td class="num">${g.n > 0 ? (g.c / g.n * 100).toFixed(2) + '%' : '-'}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;

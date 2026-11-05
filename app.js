@@ -195,7 +195,7 @@ function addVariant() {
         </div>
         <div class="fg">
           <label>Rate</label>
-          <div class="rate-display" id="${id}-rate" style="color:${color}">—</div>
+          <div class="rate-display" id="${id}-rate" style="color:${color}">-</div>
         </div>
       </div>
     </div>
@@ -248,11 +248,11 @@ function distributeEvenly() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function v(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
-function fmt(n, d=2) { return isFinite(n) ? n.toFixed(d) : '—'; }
+function fmt(n, d=2) { return isFinite(n) ? n.toFixed(d) : '-'; }
 function fmtPct(n) { return fmt(n*100,2)+'%'; }
 
 function renderEffectInterval(interval) {
-  if (!interval || interval.uplift === null) return '<span class="effect-unavailable" aria-label="Interval undefined" data-tooltip="Relative uplift needs at least one control conversion.">—</span>';
+  if (!interval || interval.uplift === null) return '<span class="effect-unavailable" aria-label="Interval undefined" data-tooltip="Relative uplift needs at least one control conversion.">-</span>';
   const { lower, upper, uplift } = interval;
   const open = !Number.isFinite(upper);
   const minimum = Math.min(0, lower, uplift);
@@ -281,6 +281,10 @@ function recalc() {
   const power      = parseFloat(document.querySelector('input[name="sPower"]:checked')?.value || '0.80');
   const tails      = parseInt(document.querySelector('input[name="sType"]:checked')?.value || '2');
   const alpha      = 1 - targetConf;
+  const alphaPct   = alpha * 100;
+  const alphaDecimals = alphaPct >= 1 ? 0 : alphaPct >= 0.1 ? 1 : alphaPct >= 0.01 ? 2 : 3;
+  const significanceHint = document.getElementById('significanceLevelHint');
+  if (significanceHint) significanceHint.textContent = `Significance level: ${fmt(alphaPct, alphaDecimals)}% (set by confidence level, not adjustable separately).`;
   const nVar       = variants.length;
 
   const adjAlpha = alpha / Math.max(1, nVar);
@@ -524,7 +528,7 @@ function renderCharts() {
         : `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit.toLocaleString()}</strong> (${(crossUnit - since).toLocaleString()} more)`;
 
     // Visitors needed (overall, at the current split) until the target power is reached
-    let sampleDisplay = '—';
+    let sampleDisplay = '-';
     if (reqUnit) {
       const when = reqUnit <= since
         ? `<span class="pos">reached</span> at unit <strong>${reqUnit.toLocaleString()}</strong>`
@@ -658,7 +662,7 @@ function renderCharts() {
           min: 1,
         },
         y: {
-          title: { display: true, text: '1 − p (%) — not confidence', font: { size: 11 } },
+          title: { display: true, text: '1 − p (%) - not confidence', font: { size: 11 } },
           min: 0, max: 100,
           ticks: { font: { size: 10 } }
         }
@@ -738,7 +742,7 @@ function renderCharts() {
           min: 1,
         },
         y: {
-          title: { display: true, text: '1 − p (%) — not confidence', font: { size: 11 } },
+          title: { display: true, text: '1 − p (%) - not confidence', font: { size: 11 } },
           min: 0, max: 100,
           ticks: { font: { size: 10 } }
         }
@@ -792,7 +796,7 @@ function renderCharts() {
     }
   });
 
-  // Chart 4: Power over time — continuous curve up to (and past) now
+  // Chart 4: Power over time - continuous curve up to (and past) now
   const reach95 = unitsFor(0.95);
   const endP = Math.min(Math.max(10, Math.ceil(Math.max(since, reach95 ?? since * 2, reqUnit ?? 0) * 1.2)), horizon);
   const powerCurve = hasEffect ? unitGrid(endP).map(u => ({ x: u, y: powerAt(u) })) : [];
@@ -918,7 +922,7 @@ function daysSince(str) {
 
 function setSinceHint(days, dateStr) {
   const label = parseLocalDate(dateStr).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  document.getElementById('scSinceHint').textContent = `${days} ${days === 1 ? 'day' : 'days'} since ${label} — time units are days`;
+  document.getElementById('scSinceHint').textContent = `${days} ${days === 1 ? 'day' : 'days'} since ${label} - time units are days`;
 }
 
 function applySinceDate() {
@@ -996,7 +1000,7 @@ function shareState() {
   navigator.clipboard.writeText(url).then(() => {
     const t = document.getElementById('shareToast');
     t.textContent = url.length > URL_WARN_CHARS
-      ? `Link copied — ${fmt(url.length / 1024, 1)} KB, some apps cut links this long`
+      ? `Link copied - ${fmt(url.length / 1024, 1)} KB, some apps cut links this long`
       : 'Link copied!';
     t.classList.add('share-toast--visible');
     setTimeout(() => t.classList.remove('share-toast--visible'), url.length > URL_WARN_CHARS ? 4500 : 2200);
@@ -1068,7 +1072,6 @@ function restoreFromParams() {
   if (dz) {
     decodeDeepData(dz)
       .then(data => {
-        if (typeof preserveExampleData === 'function' && preserveExampleData(data, dz)) return;
         setDeepData(data, dz);
         chartsDirty = true;
         renderCharts();
@@ -1182,8 +1185,8 @@ function updateRail() {
     const upl = parseFloat(document.getElementById('scUplift').value);
     chips.push(
       ['Power', pct(power)],
-      ['Since', since || '—'],
-      ['Uplift', isFinite(upl) ? `${upl > 0 ? '+' : ''}${upl}%` : '—'],
+      ['Since', since || '-'],
+      ['Uplift', isFinite(upl) ? `${upl > 0 ? '+' : ''}${upl}%` : '-'],
     );
   }
   if (deepEnabled()) chips.push(['Basis', !deepData ? 'avg' : deepWindowRaw() === 'all' ? 'all' : `${deepWindowRaw()}d`]);

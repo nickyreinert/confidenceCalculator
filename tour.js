@@ -1,6 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// QUICK TOUR — spotlight + short explanation, step by step
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
+// QUICK TOUR - spotlight + short explanation, step by step
+// -----------------------------------------------------------------------------
 
 const $tour = sel => document.querySelector(sel);
 const headerToggle = id => () => document.getElementById(id)?.closest('label');
@@ -10,7 +10,7 @@ const TOUR_STEPS = [
   {
     target: [() => $tour('#grp-ctrl')],
     title: 'Control group',
-    text: `Your original version. Enter <strong>Visitors</strong> — people who saw it — and <strong>Conversions</strong> — people who did what you want: bought, signed up, clicked.`,
+    text: `Your original version. Enter <strong>Visitors</strong> - people who saw it - and <strong>Conversions</strong> - people who did what you want: bought, signed up, clicked.`,
   },
   {
     target: [() => variants[0] && document.getElementById('col-' + variants[0].id), () => $tour('.add-group-btn')],
@@ -18,16 +18,36 @@ const TOUR_STEPS = [
     text: `The version you're testing. Same two numbers: visitors and conversions. The result shows up right below. Testing more ideas at once? Add up to 5 variants with <strong>+ Add Variant</strong>.`,
   },
   {
+    target: [() => $tour('.effect-summary')],
+    title: 'Uplift and interval',
+    text: `Uplift is the measured relative difference between the variant and control group. It can be positive or negative. The confidence interval shows a plausible range for the true effect. If it excludes zero, the result is statistically significant. If it includes zero, the result is not statistically significant. That does not prove there is no effect.`,
+  },
+  {
     target: [() => $tour('#confRadios')?.closest('.radio-group')],
     sidebar: true,
     title: 'Confidence level',
-    text: `With a <strong>95%</strong> confidence method, about 95 in 100 newly calculated intervals would contain the fixed true effect across repeated experiments. This matches α = 5%, not a 95% probability the variant wins.`,
+    text: () => {
+      const confidence = Number(document.querySelector('input[name="sConf"]:checked')?.value || '0.95') * 100;
+      const confidencePct = Number(confidence.toFixed(5));
+      const alphaPct = Number((100 - confidencePct).toFixed(5));
+      return `With a <strong>${confidencePct}%</strong> confidence level, about ${confidencePct} out of 100 intervals from repeated tests would contain the true effect. If you repeated the test with different users, the observed uplift or downlift would vary, but the true effect would stay the same. A lower confidence level produces a narrower interval, which can put its lower bound above zero. It also means a higher alpha (1 - confidence level = ${alphaPct}%) and a greater risk of a false positive.`;
+    },
+  },
+  {
+    target: [() => $tour('#confRadios')?.closest('.radio-group')],
+    sidebar: true,
+    title: 'Significance level',
+    text: () => {
+      const confidence = Number(document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
+      const alphaPct = Number(((1 - confidence) * 100).toFixed(5));
+      return `A significance level of <strong>${alphaPct}%</strong> sets the accepted risk of false positives. If there is truly no effect, about ${alphaPct} out of 100 comparable tests would incorrectly detect one. It is determined by the selected confidence level (alpha = 1 - confidence level), not set separately. The confidence level trades off interval precision against false-positive risk.`;
+    },
   },
   {
     target: [() => $tour('#typeRadios')?.closest('.radio-group')],
     sidebar: true,
     title: 'Test type',
-    text: `<strong>Two-tailed</strong> checks if the variant is better <em>or</em> worse — the safe default. <strong>One-tailed</strong> only looks in one direction: faster, but blind to the other one.`,
+    text: `<strong>Two-tailed</strong> checks if the variant is better <em>or</em> worse - the safe default. <strong>One-tailed</strong> only looks in one direction: faster, but blind to the other one.`,
   },
   {
     target: [headerToggle('projToggle')],
@@ -37,18 +57,18 @@ const TOUR_STEPS = [
   {
     target: [() => $tour('#powerRadioGroup'), headerToggle('projToggle')],
     sidebar: true,
-    title: 'Power — why it matters',
-    text: `IF an effect of the <strong>separately assumed size</strong> really exists, an 80%-powered test detects it in about 80 of 100 comparable experiments. This is not the probability today's result is correct. Not significant does not mean no effect.`,
+    title: 'Power: why it matters',
+    text: `If an effect of the <strong>separately assumed size</strong> really exists, an 80%-powered test detects it in about 80 of 100 comparable experiments. The power is about the ability of the test to identify an effect. Power does not tell you if the result is true. If there is no effect at all, power is not relevant.`,
     hiddenText: ' Turn on <strong>Projection</strong> to set it.',
   },
   {
     target: [() => $tour('.share-btn[onclick="openImport()"]')],
     title: 'Import from Adobe',
-    text: `In Analysis Workspace, build a table with <em>Experience</em> as rows and <em>Unique Visitors</em> plus a conversion metric as columns. Select it, copy (Ctrl/⌘+C) and paste it here — or just press Ctrl/⌘+V anywhere on the page. Excel, Sheets and CSV work too. Nothing leaves your browser.`,
+    text: `In Analysis Workspace, build a table with <em>Experience</em> as rows and <em>Unique Visitors</em> plus a conversion metric as columns. Select it, copy (Ctrl/⌘+C) and paste it here - or just press Ctrl/⌘+V anywhere on the page. Excel, Sheets and CSV work too. Nothing leaves your browser.`,
   },
   {
     target: [headerToggle('deepToggle')],
-    title: 'Deep dive — why it matters',
+    title: 'Deep dive: why it matters',
     text: `Add a <em>Day</em> breakdown in Adobe (Experience → Day), import it and switch this on. You'll see how the test developed day by day and catch what totals hide: a broken split, an effect that wears off, traffic piling up on a few days. Projections then use your recent traffic, too.`,
   },
 ];
@@ -137,7 +157,8 @@ function showTourStep(i, dir = 1) {
   const usedFallback = el !== candidates[0];
   document.getElementById('tourCount').textContent = `${i + 1} / ${TOUR_STEPS.length}`;
   document.getElementById('tourTitle').textContent = step.title;
-  document.getElementById('tourText').innerHTML = step.text + (usedFallback && step.hiddenText ? step.hiddenText : '');
+  const stepText = typeof step.text === 'function' ? step.text() : step.text;
+  document.getElementById('tourText').innerHTML = stepText + (usedFallback && step.hiddenText ? step.hiddenText : '');
   document.getElementById('tourDots').innerHTML = TOUR_STEPS
     .map((_, j) => `<span class="${j === i ? 'is-active' : j < i ? 'is-done' : ''}"></span>`).join('');
   document.getElementById('tourBack').style.visibility = i === 0 ? 'hidden' : '';
@@ -145,7 +166,7 @@ function showTourStep(i, dir = 1) {
 
   el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
   placeTour();
-  // Smooth scrolling moves the target for a moment — follow it
+  // Smooth scrolling moves the target for a moment - follow it
   [120, 300, 600].forEach(ms => setTimeout(placeTour, ms));
   document.getElementById('tourNext').focus({ preventScroll: true });
 }

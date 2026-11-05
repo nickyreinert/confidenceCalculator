@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Confidence Calculator — A/B Test Calculator</title>
+<title>Confidence Calculator - A/B Test Calculator</title>
 <meta name="description" content="A simple confidence calculator for A/B tests. Calculate confidence levels, p-values, power, uplift, visitor needs and Bonferroni-adjusted thresholds without pretending you need to be a data scientist.">
 <link rel="stylesheet" href="style.css">
 <script>
@@ -17,15 +17,15 @@
   <div class="header-inner">
     <div class="header-brand">
       <h1>Confidence Calculator</h1>
-      <p>A/B testing made easy — by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
+      <p>A/B testing made easy - by <a href="https://institut-fdh.de" target="_blank" rel="noopener" class="header-link">Institut für digitale Herausforderungen</a></p>
     </div>
     <div class="header-actions">
       <div class="calc-toggle calc-toggle--tri" id="calcToggle" data-state="off" role="radiogroup" aria-label="Calculation details">
         <span class="calc-toggle-track">
           <span class="calc-toggle-thumb"></span>
-          <label class="tri-zone" title="Off — one-line result"><input type="radio" name="calcMode" value="off" checked onchange="setCalcMode(this.value)" aria-label="Off — one-line result"></label>
-          <label class="tri-zone" title="On — result summary"><input type="radio" name="calcMode" value="on" onchange="setCalcMode(this.value)" aria-label="On — result summary"></label>
-          <label class="tri-zone" title="Full — summary + calculation steps"><input type="radio" name="calcMode" value="full" onchange="setCalcMode(this.value)" aria-label="Full — summary and calculation steps"></label>
+          <label class="tri-zone" title="Off - one-line result"><input type="radio" name="calcMode" value="off" checked onchange="setCalcMode(this.value)" aria-label="Off - one-line result"></label>
+          <label class="tri-zone" title="On - result summary"><input type="radio" name="calcMode" value="on" onchange="setCalcMode(this.value)" aria-label="On - result summary"></label>
+          <label class="tri-zone" title="Full - summary + calculation steps"><input type="radio" name="calcMode" value="full" onchange="setCalcMode(this.value)" aria-label="Full - summary and calculation steps"></label>
         </span>
         <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 4H6l6 7-6 7h12"/></svg>
         <span class="calc-toggle-label" aria-hidden="true">Calc · <span class="calc-toggle-state" id="calcToggleState">Off</span></span>
@@ -54,8 +54,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Share
       </button>
-      <button class="theme-btn tour-btn" onclick="startTour()" aria-label="Quick tour" title="Quick tour — how this calculator works">?</button>
-      <button class="share-btn" id="exampleStart" onclick="startExample()">Example mode</button>
+      <button class="theme-btn tour-btn" onclick="startTour()" aria-label="Quick tour" title="Quick tour - how this calculator works">?</button>
       <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
     </div>
     <div class="share-toast" id="shareToast">Link copied!</div>
@@ -78,7 +77,7 @@
     <div class="sidebar-rail" onclick="toggleSidebar(false)" title="Expand sidebar">
       <div class="rail-visitors">
         <span class="rail-vis-label">Overall visitors</span>
-        <span class="rail-vis-val" id="railVis">—</span>
+        <span class="rail-vis-val" id="railVis">-</span>
       </div>
       <div class="rail-chips" id="railChips"></div>
     </div>
@@ -106,6 +105,7 @@
           <label class="radio-pill"><input type="radio" name="sConf" value="0.9999" onchange="recalc()"><span>99.99%</span></label>
           <label class="radio-pill"><input type="radio" name="sConf" value="0.99999" onchange="recalc()"><span>99.999%</span></label>
         </div>
+        <small class="conf-alpha-hint" id="significanceLevelHint">Significance level: 5% (set by confidence level, not adjustable separately).</small>
       </div>
       <div class="radio-group">
         <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed checks increases and decreases. One-tailed tests an increase only: choose the direction before collecting data." onclick="openConcept('althypothesis')">?</button></span>
@@ -130,9 +130,9 @@
         <label for="scSince">Running since</label>
         <div class="since-row">
           <input type="number" id="scSince" value="1" min="1" step="1" oninput="chartsDirty=true;renderCharts()">
-          <input type="date" id="scSinceDate" aria-label="Test start date" title="Pick the start date — counts the days since then" onchange="onSinceDateChange()">
+          <input type="date" id="scSinceDate" aria-label="Test start date" title="Pick the start date - counts the days since then" onchange="onSinceDateChange()">
         </div>
-        <span class="hint" id="scSinceHint">Time units the test has been live — days, weeks, whatever you use consistently. Or pick a start date to count days.</span>
+        <span class="hint" id="scSinceHint">Time units the test has been live - days, weeks, whatever you use consistently. Or pick a start date to count days.</span>
       </div>
       <div class="fg">
         <label for="scUplift">Assumed relevant effect for power (%) <button class="help-btn" data-tooltip="Choose an effect that matters before testing. This is a relative change, not the observed result." onclick="openConcept('power')">?</button></label>
@@ -172,8 +172,6 @@
     <div id="bonferroniAlert" class="alert alert-warn" style="display:none">
       With <strong id="bfCount">2</strong> variants, intervals use <strong id="bfAlpha">97.5%</strong> per-comparison coverage for the selected <strong id="bfTargetConf">95%</strong> family confidence level. The matching p-value threshold is α divided by the number of variants. <button class="help-btn" data-tooltip="Bonferroni adjusts both the interval and the test for multiple comparisons." onclick="openConcept('bonferroni')">?</button>
     </div>
-
-    <div id="exampleBanner" class="alert alert-info" hidden>Example mode · Illustrative data, not a real experiment. <button type="button" class="btn-split" onclick="exitExample()">Exit example mode</button></div>
 
     <!-- Group + result columns grid -->
     <div class="groups-grid calc-hidden calc-collapsed" id="groupsGrid">
@@ -262,7 +260,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerVis"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Based on your expected uplift assumption — larger real effect = fewer visitors needed</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Based on your expected uplift assumption - larger real effect = fewer visitors needed</div>
         </div>
         <div class="chart-box">
           <div class="chart-box-header">
@@ -274,7 +272,7 @@
             </button>
           </div>
           <div class="chart-wrap" style="height:280px"><canvas id="cPowerTime"></canvas></div>
-          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct — how likely the test is to detect it after each time unit</div>
+          <div class="scen-chart-sub" style="margin-top:var(--space-3)">Assuming your expected uplift is correct - how likely the test is to detect it after each time unit</div>
         </div>
       </div>
     </section>
@@ -294,7 +292,7 @@
 
       <div class="deep-empty" id="deepEmpty">
         <p><strong>Paste daily numbers to see how your test developed over time.</strong></p>
-        <p>One row per group and day — e.g. an Adobe Workspace table with <em>Experience → Day</em>, or a sheet with <code>Group · Date · Visitors · Conversions</code>. Totals rows are fine, they're used for the cards.</p>
+        <p>One row per group and day - e.g. an Adobe Workspace table with <em>Experience → Day</em>, or a sheet with <code>Group · Date · Visitors · Conversions</code>. Totals rows are fine, they're used for the cards.</p>
         <button type="button" class="import-btn import-btn--primary" onclick="openImport()">Import daily data</button>
       </div>
 
@@ -309,7 +307,7 @@
               </button>
             </div>
             <div class="chart-wrap" style="height:280px"><canvas id="cDeepTraffic"></canvas></div>
-            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Visitors per day and group — spikes and gaps show up here first</div>
+            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Visitors per day and group - spikes and gaps show up here first</div>
           </div>
           <div class="chart-box">
             <div class="chart-box-header">
@@ -319,7 +317,7 @@
               </button>
             </div>
             <div class="chart-wrap" style="height:280px"><canvas id="cDeepConf"></canvas></div>
-            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Your real data, added up day by day. The line will cross the threshold by chance now and then — don't stop the test at the first crossing.</div>
+            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Your real data, added up day by day. The line will cross the threshold by chance now and then - don't stop the test at the first crossing.</div>
           </div>
           <div class="chart-box chart-box--wide">
             <div class="chart-box-header">
@@ -329,7 +327,7 @@
               </button>
             </div>
             <div class="chart-wrap" style="height:300px"><canvas id="cDeepUplift"></canvas></div>
-            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Line = uplift so far, shaded = likely range. Dots = uplift within each week — a downward trend means the effect is wearing off.</div>
+            <div class="scen-chart-sub" style="margin-top:var(--space-3)">Line = uplift so far, shaded = likely range. Dots = uplift within each week - a downward trend means the effect is wearing off.</div>
           </div>
         </div>
       </div>
@@ -340,7 +338,7 @@
       <div class="deep-head">
         <div class="chart-title-group">
           <div class="chart-box-title">Breakdowns</div>
-          <div class="scen-chart-sub">Patterns, not winners: slice data often enough and some slices look like big wins or losses by pure chance. Use this to spot patterns — e.g. weekends behave differently — not to crown a winner per slice.</div>
+          <div class="scen-chart-sub">Patterns, not winners: slice data often enough and some slices look like big wins or losses by pure chance. Use this to spot patterns - e.g. weekends behave differently - not to crown a winner per slice.</div>
         </div>
         <div class="radio-pills" role="tablist" id="breakdownTabs">
           <label class="radio-pill"><input type="radio" name="sBreakdown" value="weekday" checked onchange="renderBreakdown()"><span>Weekday</span></label>
@@ -360,7 +358,7 @@
     <div class="import-head">
       <div>
         <div class="import-title" id="importTitle">Import test data</div>
-        <div class="import-sub">Copy the table from Adobe Analysis Workspace (A4T panel or freeform table), a Target report CSV, Excel or Google Sheets, then paste it here. One row per experience — or one row per experience and day for the Deep dive. Nothing leaves your browser.</div>
+        <div class="import-sub">Copy the table from Adobe Analysis Workspace (A4T panel or freeform table), a Target report CSV, Excel or Google Sheets, then paste it here. One row per experience - or one row per experience and day for the Deep dive. Nothing leaves your browser.</div>
       </div>
       <button type="button" class="btn-remove import-close" onclick="closeImport()" aria-label="Close">✕</button>
     </div>
@@ -400,7 +398,6 @@
 <script src="app.js"></script>
 <script src="import.js"></script>
 <script src="tour.js"></script>
-<script src="example.js"></script>
 <script>
 function toggleTheme() {
   const root = document.documentElement;

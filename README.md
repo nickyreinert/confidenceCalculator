@@ -13,7 +13,6 @@ New sessions start with one control and one variant, calculation details off, an
 - Compares visitors and conversions for your control and test versions
 - Shows conversion rates, observed relative uplift, its confidence interval, p-value and significance decision together
 - Separates the assumed relevant effect for power from the observed uplift
-- **Example mode:** three keyboard-accessible explanations using illustrative counts, with original inputs restored on exit
 - Estimates how many visitors you may need and charts your projections
 - Imports data pasted from a spreadsheet or report
 - Shares your test setup with a link
@@ -34,7 +33,7 @@ Use the fictional [sample data](demo-data.csv) to try an A/B test:
 
 ## Deep dive
 
-Turn on **Deep dive** in the header and import one row per group and day — e.g. an Adobe Workspace table with *Experience → Day*.
+Turn on **Deep dive** in the header and import one row per group and day - e.g. an Adobe Workspace table with *Experience → Day*.
 
 ![Deep dive with checks, daily traffic, confidence and uplift over time](assets/deep-dive.jpg)
 
@@ -43,7 +42,7 @@ Turn on **Deep dive** in the header and import one row per group and day — e.g
 - **Breakdowns:** weekday, day of month, month
 - **Better projections:** based on the last 7, 14 or 28 days (or all days) instead of the average since the start
 
-Try it with the fictional [daily sample data](demo-daily.csv) — a test that looks like a clear win, until the Deep dive shows the effect wearing off.
+Try it with the fictional [daily sample data](demo-daily.csv) - a test that looks like a clear win, until the Deep dive shows the effect wearing off.
 
 ## Statistical method
 
@@ -71,12 +70,10 @@ Power is an approximate normal-model planning calculation using the **separately
 
 The retained evidence-projection charts plot **1 - p**, explicitly labelled as not confidence. They are conditional scenarios, not probabilities of winning or a license to stop at a crossing. Adequate power does not establish sufficient calendar duration; plan business cycles and a stopping rule in advance.
 
-Example mode uses control `100/1000`, variant `112/1000`, and a separate assumed effect of +20% for power. It compares that interval with variant `150/1000` against the same control. Both intervals and decisions are calculated, not hardcoded. These are distinct illustrative datasets, not a repeated-experiment simulation. Counts, variants, settings, daily data and the original URL are preserved on exit; example navigation does not overwrite the URL.
-
 ## Regression tests
 
 Open [tests.html](tests.html) through the same static host as the calculator, or serve this directory with `python3 -m http.server 8000` and visit `http://localhost:8000/tests.html`. No build step or test dependencies are needed; the application still loads Chart.js from its existing CDN. The test page reports PASS/FAIL and sets `document.documentElement.dataset.tests` to `passed` or `failed`.
 
-Coverage includes numerical interval regressions, confidence-level changes, swapped groups, 1,350 test/interval consistency checks (unequal samples, boundary rates, count metrics and Bonferroni), invalid/zero counts, one-sided direction, power behavior, independent planning assumptions, visible results in compact mode, example navigation, native modal/focus handling, repeated entry/exit, original variant-node restoration and exact sharing-state restoration. For responsive inspection, resize the test iframe or open the calculator at a mobile viewport and navigate Example mode with Tab, arrow keys and Escape.
+Coverage includes numerical interval regressions, confidence-level changes, swapped groups, 1,350 test/interval consistency checks (unequal samples, boundary rates, count metrics and Bonferroni), invalid/zero counts, one-sided direction, power behavior, independent planning assumptions, visible results in compact mode, help-sidebar access, fresh-start defaults and shared-link settings. For responsive inspection, resize the test iframe or open the calculator at a mobile viewport.
 
 **Note:** A 95% confidence method covers the fixed true effect in about 95% of newly calculated intervals over repeated experiments. It is not a 95% probability the variant wins or that today's uplift will repeat. Not significant does not establish no effect.

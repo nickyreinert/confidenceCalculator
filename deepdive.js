@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DEEP DIVE — daily history, checks and breakdowns
+// DEEP DIVE - daily history, checks and breakdowns
 // Loaded before app.js; only uses app.js helpers at call time.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// { dates: ['YYYY-MM-DD', …] (contiguous), groups: [{ label, n: [], c: [] }] } — groups[0] is control
+// { dates: ['YYYY-MM-DD', …] (contiguous), groups: [{ label, n: [], c: [] }] } - groups[0] is control
 let deepData = null;
 let deepEncoded = '';      // compressed copy for share links (filled asynchronously)
 let deepPending = '';      // compressed data from the URL that is still being decoded
@@ -40,7 +40,7 @@ function deepSettings() {
   return { targetConf, tails, adjConf: 1 - (1 - targetConf) / Math.max(1, nVar) };
 }
 
-// Chi-square upper tail: exact for 1 degree of freedom, Wilson–Hilferty approximation above
+// Chi-square upper tail: exact for 1 degree of freedom, Wilson-Hilferty approximation above
 function chiSquareP(x, df) {
   if (!(x > 0)) return 1;
   if (df === 1) return 2 * (1 - normalCDF(Math.sqrt(x)));
@@ -58,7 +58,6 @@ function setDeepData(data, encoded) {
     const seq = ++deepEncodeSeq;
     encodeDeepData(deepData).then(s => {
       if (seq !== deepEncodeSeq) return;
-      if (typeof preserveExampleData === 'function' && preserveExampleData(null, s)) return;
       deepEncoded = s;
       if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
       renderDeepInfo();
@@ -151,13 +150,13 @@ function renderDeepInfo() {
   if (!el) return;
   if (!deepData) { el.textContent = 'No daily data yet.'; return; }
   const { dates, groups } = deepData;
-  let txt = `${fmtShortDate(dates[0])} – ${fmtShortDate(dates[dates.length - 1])} · ${dates.length} days · ${groups.length} groups · daily visitors are added up, so a repeat visitor counts once per day`;
+  let txt = `${fmtShortDate(dates[0])} - ${fmtShortDate(dates[dates.length - 1])} · ${dates.length} days · ${groups.length} groups · daily visitors are added up, so a repeat visitor counts once per day`;
   let warn = false;
   if (deepEncoded) {
     const len = (location.origin + location.pathname + '?' + buildStateParams().toString()).length;
     warn = len > URL_WARN_CHARS;
     txt += ` · share link ≈ ${fmt(len / 1024, 1)} KB`;
-    if (warn) txt += ' — long: some apps cut links this size';
+    if (warn) txt += ' - long: some apps cut links this size';
   }
   el.textContent = txt;
   el.classList.toggle('neg', warn);
@@ -197,7 +196,7 @@ function renderDeepChecks() {
     const help = `<button class="help-btn" data-tooltip="${CONCEPTS.splitStability.tooltip}" onclick="openConcept('splitStability')">?</button>`;
     // Needs to be both unlikely by chance and big enough to matter
     if (p < 0.001 && hi - lo >= 0.02) {
-      add('warn', `<strong>The split changed during the test.</strong> ${range}. If conversion rates also moved over time, the totals can mislead — check the traffic chart and, if needed, only use the period with a steady split. ${help}`);
+      add('warn', `<strong>The split changed during the test.</strong> ${range}. If conversion rates also moved over time, the totals can mislead - check the traffic chart and, if needed, only use the period with a steady split. ${help}`);
     } else {
       add('ok', `<strong>Split stayed steady.</strong> ${range}. ${help}`);
     }
@@ -219,21 +218,21 @@ function renderDeepChecks() {
       const z = se > 0 ? ((p2b - p1b) - (p2a - p1a)) / se : 0;
       const halves = `${signPct(ua)} in the first half → ${signPct(ub)} in the second half`;
       if (Math.abs(z) < 1.96) {
-        add('ok', `<strong>${escapeHtml(g.label)}: no clear change in uplift.</strong> ${halves} — within normal ups and downs.`);
+        add('ok', `<strong>${escapeHtml(g.label)}: no clear change in uplift.</strong> ${halves} - within normal ups and downs.`);
       } else if (Math.abs(ub) < Math.abs(ua) || Math.sign(ub) !== Math.sign(ua)) {
-        add('warn', `<strong>${escapeHtml(g.label)}: uplift is fading.</strong> ${halves}. Typical for a novelty effect — people react to "new" at first, then get used to it. The overall result likely overstates the long-term effect.`);
+        add('warn', `<strong>${escapeHtml(g.label)}: uplift is fading.</strong> ${halves}. Typical for a novelty effect - people react to "new" at first, then get used to it. The overall result likely overstates the long-term effect.`);
       } else {
         add('warn', `<strong>${escapeHtml(g.label)}: uplift is growing.</strong> ${halves}. People may need time to get used to the change. The overall result may understate the long-term effect.`);
       }
     });
   } else {
-    add('info', `<strong>Fading check needs 14 days.</strong> You have ${days} — come back later to see if the effect holds up.`);
+    add('info', `<strong>Fading check needs 14 days.</strong> You have ${days} - come back later to see if the effect holds up.`);
   }
 
   // 3. Full weeks
   const weeks = Math.floor(days / 7), rest = days % 7;
   if (days < 7) {
-    add('warn', `<strong>Less than one full week.</strong> Weekdays and weekends often behave differently — run at least one full week, ideally two.`);
+    add('warn', `<strong>Less than one full week.</strong> Weekdays and weekends often behave differently - run at least one full week, ideally two.`);
   } else if (rest) {
     add('info', `<strong>${weeks} ${weeks === 1 ? 'week' : 'weeks'} and ${rest} ${rest === 1 ? 'day' : 'days'}.</strong> Some weekdays count more than others. Full weeks give the fairest result.`);
   } else {
@@ -249,7 +248,7 @@ function renderDeepChecks() {
     if (lastShare > 0.5) {
       add('warn', `<strong>${pctShort(lastShare)} of visitors came in the last ${k} of ${days} days.</strong> The result mostly reflects that period, not the whole test.`);
     } else if (topShare > 0.5) {
-      add('warn', `<strong>${pctShort(topShare)} of visitors came on just ${k} of ${days} days.</strong> The result mostly reflects those days — check what happened then (campaign, sale, outage).`);
+      add('warn', `<strong>${pctShort(topShare)} of visitors came on just ${k} of ${days} days.</strong> The result mostly reflects those days - check what happened then (campaign, sale, outage).`);
     }
   }
 
@@ -331,7 +330,7 @@ function renderDeepCharts() {
       plugins: { legend, tooltip: { callbacks: { label: c => c.raw === null ? null : `${c.dataset.label}: ${fmt(c.raw, 2)}%` } } },
       scales: {
         x: { ticks: xTicks, grid: { display: false } },
-        y: { min: 0, max: 100, title: { display: true, text: '1 − p (%) — not confidence', font: { size: 11 } }, ticks: { font: { size: 10 } } },
+        y: { min: 0, max: 100, title: { display: true, text: '1 − p (%) - not confidence', font: { size: 11 } }, ticks: { font: { size: 10 } } },
       },
     },
   });
@@ -453,7 +452,7 @@ function renderBreakdown() {
         const cells = groups.slice(1).map((_, i) => {
           const gi = i + 1;
           const p2 = r.n[gi] > 0 ? r.c[gi] / r.n[gi] : 0;
-          if (!(r.n[0] > 0 && r.n[gi] > 0 && p1 > 0)) return '<td class="num">—</td><td class="num">—</td><td class="num">—</td>';
+          if (!(r.n[0] > 0 && r.n[gi] > 0 && p1 > 0)) return '<td class="num">-</td><td class="num">-</td><td class="num">-</td>';
           const up = p2 / p1 - 1;
           const { z } = zTest(r.n[0], r.c[0], r.n[gi], r.c[gi]);
           const conf = (1 - pFromZ(z, tails)) * 100;

@@ -10,9 +10,9 @@ const CONCEPTS = {
       <p>The relative uplift interval inverts a two-sample score test for the rate ratio. Excluding zero matches the two-sided significance decision. Multiple comparisons use the same Bonferroni-adjusted α in the test and interval. A one-sided increase test uses a matching lower bound instead.</p>
       <h4>Common thresholds</h4>
       <ul>
-        <li><strong>90%</strong> — exploratory tests, low-stakes decisions</li>
-        <li><strong>95%</strong> — standard for most product A/B tests</li>
-        <li><strong>99%</strong> — high-stakes changes, pricing, legal-adjacent decisions</li>
+        <li><strong>90%</strong> - exploratory tests, low-stakes decisions</li>
+        <li><strong>95%</strong> - standard for most product A/B tests</li>
+        <li><strong>99%</strong> - high-stakes changes, pricing, legal-adjacent decisions</li>
       </ul>
     `
   },
@@ -45,7 +45,7 @@ const CONCEPTS = {
       <ul>
         <li>p-value is <strong>not</strong> the probability the variant is better.</li>
         <li>p &lt; 0.05 does <strong>not</strong> mean the effect is large or meaningful.</li>
-        <li>A high p-value does not prove the null is true — it just means you lack evidence.</li>
+        <li>A high p-value does not prove the null is true - it just means you lack evidence.</li>
       </ul>
     `
   },
@@ -55,7 +55,7 @@ const CONCEPTS = {
     deep: `
       <p>The null hypothesis says: <em>"The test will have no effect on the conversion rate."</em></p>
       <p>Your goal is to find enough evidence to reject it. Statistics does not prove the null hypothesis wrong with absolute certainty; it measures how unlikely your data would be if the null hypothesis were true.</p>
-      <p>Failing to reject it does not prove the variant has no effect. It only means your data is not strong enough to rule out chance yet — maybe the effect is small, maybe you need more visitors, maybe nothing is going on.</p>
+      <p>Failing to reject it does not prove the variant has no effect. It only means your data is not strong enough to rule out chance yet - maybe the effect is small, maybe you need more visitors, maybe nothing is going on.</p>
     `
   },
   althypothesis: {
@@ -130,10 +130,10 @@ const CONCEPTS = {
     label: 'Split stability',
     tooltip: 'Checks if every week got roughly the same split as your totals. A split that moves over time can make the totals mislead.',
     deep: `
-      <p>Your totals have a split — say 50/50 or 10/90. The daily data shows if that split held up week by week.</p>
+      <p>Your totals have a split - say 50/50 or 10/90. The daily data shows if that split held up week by week.</p>
       <p>Small ups and downs are normal. The check only warns when the changes are both too big to be chance <em>and</em> at least 2 percentage points.</p>
       <h4>Why it matters</h4>
-      <p>Say control gets most visitors in a strong sales week and the variant gets most in a weak one. Then the variant looks worse — not because of the change you made, but because of <em>when</em> its visitors came.</p>
+      <p>Say control gets most visitors in a strong sales week and the variant gets most in a weak one. Then the variant looks worse - not because of the change you made, but because of <em>when</em> its visitors came.</p>
       <h4>Common causes</h4>
       <ul>
         <li>The split was changed while the test was running</li>
@@ -147,8 +147,8 @@ const CONCEPTS = {
     label: 'Traffic basis',
     tooltip: 'Projections need to know how many visitors are coming in now. Recent days say more about that than the average since the start.',
     deep: `
-      <p>Projections answer "how long until…?" — so they need today's traffic, not last year's.</p>
-      <p>Without daily data, the calculator divides all visitors by the days the test has been running. That's fine when traffic is steady. When it isn't — say 390 quiet days and then 10 busy ones — the average is far too low and projections become far too pessimistic.</p>
+      <p>Projections answer "how long until…?" - so they need today's traffic, not last year's.</p>
+      <p>Without daily data, the calculator divides all visitors by the days the test has been running. That's fine when traffic is steady. When it isn't - say 390 quiet days and then 10 busy ones - the average is far too low and projections become far too pessimistic.</p>
       <p>With daily data, you choose: the average of the last 7, 14 or 28 days, or of all pasted days. Today is left out while it's still running, because a half day would pull the average down.</p>
       <p><strong>Tip:</strong> 14 days evens out weekday swings. Use 7 days if traffic just changed, 28 days if it's very bumpy. <em>All days</em> only fits when traffic has been steady the whole time.</p>
     `

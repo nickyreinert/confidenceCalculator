@@ -17,7 +17,7 @@ function openConcept(id) {
   const sidebar = document.getElementById('conceptSidebar');
   sidebar.classList.add('is-open');
   sidebar.setAttribute('aria-hidden', 'false');
-  // no scroll lock — bottom sheet doesn't need it, content stays visible
+  // no scroll lock - bottom sheet doesn't need it, content stays visible
 }
 
 function closeSidebar() {
