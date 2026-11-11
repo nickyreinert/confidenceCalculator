@@ -47,7 +47,22 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(close(calculator.powerFromN(1000, 1000, 0.1, 0.1, 0.05, 2), 5, 0.001), 'Power at zero assumed effect equals alpha');
     assert(calculator.powerFromN(5000, 5000, 0.1, 0.12, 0.05, 2) > calculator.powerFromN(1000, 1000, 0.1, 0.12, 0.05, 2), 'Power grows with sample size');
     assert(calculator.powerFromN(1000, 1000, 0.1, 0.12, 0.01, 2) < calculator.powerFromN(1000, 1000, 0.1, 0.12, 0.05, 2), 'Stricter alpha reduces power');
+    const observedUplift = (163222 / 305750) / (164621 / 306636) - 1;
+    const forecastP = (days, uplift = observedUplift, traffic = 1, tails = 2) => calculator.projectedPValue(
+      306636, 164621, 305750, 163222, 306636 / 30 * traffic, 305750 / 30 * traffic, days, uplift, tails);
+    assert(close(forecastP(0), 0.01782805431905432), 'Shared example is not significant at 99% on day 30');
+    assert(forecastP(5) > 0.01 && forecastP(6) < 0.01, 'Observed negative effect crosses the two-sided threshold on day 36');
+    assert(close(forecastP(0, observedUplift * 2, 2), forecastP(0)), 'Future uplift and traffic never rewrite current evidence');
+    assert(forecastP(6, observedUplift * 2) < forecastP(6) && forecastP(6, observedUplift * 0.5) > forecastP(6), 'Future effect scenarios use cumulative conversions');
+    assert(forecastP(6, observedUplift, 2) < forecastP(6) && forecastP(6, observedUplift, 0.5) > forecastP(6), 'Traffic scenarios change only future visitors');
+    assert(forecastP(1000, observedUplift, 1, 1) > 0.99, 'Negative uplift never signals a one-sided increase');
+    assert(calculator.projectedPValue(0, 0, 10, 1, 1, 1, 0, 0.1, 2) === null && calculator.projectedPValue(10, 9, 10, 9, 1, 1, 1, 1, 2) === null, 'Invalid samples and impossible binary future rates rejected');
     const doc = calculator.document;
+    for (const [from, to, backwards] of [['ctrl-n', 'ctrl-c', false], ['ctrl-c', 'v0-n', false], ['v0-n', 'v0-c', false], ['v0-c', 'v1-n', false], ['v1-n', 'v0-c', true], ['v0-n', 'ctrl-c', true]]) {
+      doc.getElementById(from).focus();
+      doc.getElementById(from).dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'Tab', shiftKey: backwards, bubbles: true, cancelable: true }));
+      assert(doc.activeElement.id === to, `Data-entry Tab order: ${from} to ${to}`);
+    }
     const assumed = doc.getElementById('scUplift').value;
     doc.getElementById('v0-c').value = 250;
     calculator.recalc();

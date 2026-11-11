@@ -65,6 +65,17 @@ function allGroupIds() {
   return ['ctrl', ...variants.map(vr => vr.id)];
 }
 
+document.getElementById('groupsGrid').addEventListener('keydown', event => {
+  if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+  const fields = allGroupIds().flatMap(id => ['n', 'c'].map(suffix => document.getElementById(`${id}-${suffix}`)));
+  const index = fields.indexOf(event.target);
+  if (index < 0) return;
+  const next = fields[index + (event.shiftKey ? -1 : 1)];
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TWO-WAY DISTRIBUTION / VISITORS SYNC
 // ─────────────────────────────────────────────────────────────────────────────
@@ -462,6 +473,16 @@ function unitGrid(end) {
   return out;
 }
 
+function projectedPValue(n1, c1, n2, c2, daily1, daily2, extraDays, uplift, tails) {
+  if (!(n1 > 0) || !(n2 > 0) || c1 < 0 || c2 < 0 || extraDays < 0) return null;
+  const controlRate = c1 / n1;
+  const variantRate = controlRate * (1 + uplift);
+  if (variantRate < 0 || (!isCountMetric(controlRate, c2 / n2) && variantRate > 1)) return null;
+  const result = zTest(n1 + daily1 * extraDays, c1 + daily1 * extraDays * controlRate,
+    n2 + daily2 * extraDays, c2 + daily2 * extraDays * variantRate);
+  return Number.isFinite(result.z) ? pFromZ(result.z, tails) : null;
+}
+
 function renderCharts() {
   updateRail();
   if (!chartsDirty) return;
@@ -483,25 +504,34 @@ function renderCharts() {
 
   // Projections start from the visitors collected so far and continue at the traffic basis:
   // recent daily traffic (deep dive data) or the average since the start.
-  // With several variants, the smallest one limits how fast evidence piles up.
-  const varNs = variants.map(vr => v(vr.id + '-n'));
-  const N1 = ctrlN, N2 = varNs.length ? Math.min(...varNs) : 0;
+  const forecastVariant = variants.reduce((selected, candidate) => {
+    const candidateP = pFromZ(zTest(ctrlN, ctrlC, v(candidate.id + '-n'), v(candidate.id + '-c')).z, tails);
+    const selectedP = selected ? pFromZ(zTest(ctrlN, ctrlC, v(selected.id + '-n'), v(selected.id + '-c')).z, tails) : -1;
+    return !selected || !Number.isFinite(candidateP) || candidateP > selectedP ? candidate : selected;
+  }, null);
+  const N1 = ctrlN, N2 = forecastVariant ? v(forecastVariant.id + '-n') : 0;
+  const C2 = forecastVariant ? v(forecastVariant.id + '-c') : 0;
+  const observedUplift = p1 > 0 && N2 > 0 ? (C2 / N2) / p1 - 1 : 0;
   const recent = deepRecentRates();
   let f1, f2, fTotal, basisTxt;
   if (recent) {
     f1 = recent.rates[0];
-    f2 = Math.min(...recent.rates.slice(1));
+    f2 = recent.rates[variants.indexOf(forecastVariant) + 1];
     fTotal = sum(recent.rates);
     basisTxt = `${recent.all ? 'all' : 'last'} ${recent.days} ${recent.days === 1 ? 'day' : 'days'} · ${Math.round(fTotal).toLocaleString()} / day`;
   } else {
     f1 = N1 / since; f2 = N2 / since; fTotal = totalVis / since;
-    basisTxt = `average since start · ${Math.round(fTotal).toLocaleString()} / unit`;
+    basisTxt = `average since start · ${Math.round(fTotal).toLocaleString()} / day`;
   }
-  const nAt = u => (u <= since ? [u * N1 / since, u * N2 / since] : [N1 + (u - since) * f1, N2 + (u - since) * f2]);
+  const planningN2 = variants.length ? Math.min(...variants.map(variant => v(variant.id + '-n'))) : 0;
+  const planningF2 = recent ? Math.min(...recent.rates.slice(1)) : planningN2 / since;
+  const nAt = u => (u <= since ? [u * N1 / since, u * planningN2 / since] : [N1 + (u - since) * f1, planningN2 + (u - since) * planningF2]);
   const totalAt = u => (u <= since ? u * totalVis / since : totalVis + (u - since) * fTotal);
-  const confAt = u => confFromN(...nAt(u), p1, p2, tails);
+  const evidenceAt = (u, uplift = observedUplift, multiplier = 1) => projectedPValue(
+    N1, ctrlC, N2, C2, f1 * multiplier, f2 * multiplier, Math.max(0, u - since), uplift, tails);
+  const confAt = u => { const p = evidenceAt(u); return p === null ? null : (1 - p) * 100; };
   const powerAt = u => powerFromN(...nAt(u), p1, p2, 1 - targetConf, tails);
-  document.getElementById('currentPower').textContent = powerAt(since) === null ? 'Power unavailable for these assumptions' : `Calculated power: ${fmt(powerAt(since),1)}% for the assumed ${fmt(expectedUplift*100,1)}% relative effect and ${N1.toLocaleString()} / ${N2.toLocaleString()} visitors (control / smallest variant).`;
+  document.getElementById('currentPower').textContent = powerAt(since) === null ? 'Power unavailable for these assumptions' : `Calculated power: ${fmt(powerAt(since),1)}% for the assumed ${fmt(expectedUplift*100,1)}% relative effect and ${N1.toLocaleString()} / ${planningN2.toLocaleString()} visitors (control / smallest variant).`;
 
   const hasEffect = p1 > 0 && expectedUplift !== 0;
   const CAP = since + 100000;
@@ -510,29 +540,37 @@ function renderCharts() {
   const reqUnit = reqUnitsExact ? Math.max(1, Math.ceil(reqUnitsExact)) : null;
 
   const confAtSince = confAt(since);
-  // Where confidence crosses the target (from the start, so a past crossing is reported too)
-  const crossExact = hasEffect ? solveUnit(confAt, targetConf * 100, CAP) : null;
+  const crossingFor = (uplift = observedUplift, multiplier = 1) => {
+    if (evidenceAt(since) === null) return null;
+    if (evidenceAt(since) <= 1 - targetConf) return since;
+    if (uplift === 0 || (tails === 1 && uplift < 0)) return null;
+    const extra = solveUnit(days => {
+      const p = evidenceAt(since + days, uplift, multiplier);
+      return p === null ? null : 1 - p;
+    }, targetConf, CAP - since);
+    return extra === null ? null : since + extra;
+  };
+  const crossExact = crossingFor();
   const crossUnit = crossExact ? Math.max(1, Math.ceil(crossExact)) : null;
 
   const horizon = Math.max(since * 4, 100);
-  const end = Math.min(Math.max(10, Math.ceil(Math.max(since, crossUnit ?? since * 2) * 1.25)), horizon);
-  const units = unitGrid(end);
+  const end = horizon;
+  const units = [since, ...unitGrid(end).filter(day => day > since)];
+  const plotP = p => p === null ? null : Math.max(0.000001, p);
+  const pText = p => p === null ? 'Unavailable' : p === 0 ? '< 1e-12' : p < 0.0001 ? p.toExponential(2) : fmt(p, 4);
+  const direction = observedUplift < 0 ? 'decrease' : 'increase';
+  const crossingText = crossing => crossing === null || crossing > horizon ? `Not within ${horizon - since} more days`
+    : crossing <= since ? `Significant ${direction}` : `Day ${Math.ceil(crossing)} (+${Math.ceil(crossing) - since} days)`;
 
   // Stat summary row
   const statEl = document.getElementById('scenStatRow');
-  if (hasEffect) {
-    const crossTxt = !crossUnit
-      ? `does not reach <strong>${fmt(targetConf*100,0)}%</strong> at this traffic`
-      : crossUnit <= since
-        ? `<span class="pos">reached</span> <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit.toLocaleString()}</strong>`
-        : `reaches <strong>${fmt(targetConf*100,0)}%</strong> at unit <strong>${crossUnit.toLocaleString()}</strong> (${(crossUnit - since).toLocaleString()} more)`;
-
+  if (evidenceAt(since) !== null) {
     // Visitors needed (overall, at the current split) until the target power is reached
     let sampleDisplay = '-';
     if (reqUnit) {
       const when = reqUnit <= since
-        ? `<span class="pos">reached</span> at unit <strong>${reqUnit.toLocaleString()}</strong>`
-        : `at unit <strong>${reqUnit.toLocaleString()}</strong> (${(reqUnit - since).toLocaleString()} more)`;
+        ? `<span class="pos">reached</span> by day <strong>${reqUnit.toLocaleString()}</strong>`
+        : `day <strong>${reqUnit.toLocaleString()}</strong> (${(reqUnit - since).toLocaleString()} more days)`;
       sampleDisplay = `${Math.round(totalAt(reqUnitsExact)).toLocaleString()} visitors · ${when}`;
     }
 
@@ -542,69 +580,67 @@ function renderCharts() {
         <span class="scen-stat-val">${fmtPct(p1)}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Uplift applied</span>
-        <span class="scen-stat-val">${upliftRaw > 0 ? '+' : ''}${fmt(upliftRaw,1)}% → ${fmtPct(p2)}</span>
+        <span class="scen-stat-label">Observed uplift · ${forecastVariant.label}</span>
+        <span class="scen-stat-val">${observedUplift > 0 ? '+' : ''}${fmt(observedUplift*100,3)}%</span>
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">Traffic basis</span>
         <span class="scen-stat-val" title="Traffic per time unit used for everything after now">${basisTxt}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Projected 1 − p (not confidence)</span>
-        <span class="scen-stat-val ${confAtSince >= targetConf*100 ? 'pos' : ''}">${fmt(confAtSince,2)}%</span>
+        <span class="scen-stat-label">${evidenceAt(since) <= 1-targetConf ? `Significant ${direction}` : 'Not significant'} · day ${since}</span>
+        <span class="scen-stat-val ${confAtSince >= targetConf*100 ? (observedUplift < 0 ? 'neg' : 'pos') : ''}">p ${pText(evidenceAt(since))} / α ${pText(1-targetConf)}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Power ${fmt(power*100,0)}% needs</span>
+        <span class="scen-stat-label">Power ${fmt(power*100,0)}% · assumed ${fmt(upliftRaw,1)}% effect</span>
         <span class="scen-stat-val" title="Overall visitors at the current split">${sampleDisplay}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Projection</span>
-        <span class="scen-stat-val">${crossTxt}</span>
+        <span class="scen-stat-label">Same pace · significant ${direction}</span>
+        <span class="scen-stat-val" title="Conditional extrapolation, not a probability or stopping rule. Future traffic and conversion rates are held constant. With several variants, the comparison with the largest current p-value is shown; thresholds are Bonferroni-adjusted.">${crossingText(crossExact)}</span>
+      </div>
+      <div class="scen-stat">
+        <span class="scen-stat-label">Half / double future uplift</span>
+        <span class="scen-stat-val">${crossingText(crossingFor(observedUplift*0.5))} / ${crossingText(crossingFor(observedUplift*2))}</span>
       </div>`;
   } else {
     statEl.innerHTML = `<div class="scen-stat"><span class="scen-stat-label">Add a variant with conversions to see the projection.</span></div>`;
   }
 
   // ── Traffic sensitivity chart ──────────────────────────────────────────────
-  // "What if traffic had been X per unit from day one" at the current basis
   const visMultipliers = [0.25, 0.5, 1, 1.5, 2];
   const visColors      = ['#cf6b6b', '#c79a4f', '#4f78d6', '#7c3aed', '#4e9e7e'];
-  const confAtVolume = (u, m) => confFromN(u * f1 * m, u * f2 * m, p1, p2, tails);
+  const confAtVolume = (u, m) => plotP(evidenceAt(u, observedUplift, m));
 
   // Pre-compute crossing unit for each volume
   const visCrossings = visMultipliers.map(m => {
-    if (!hasEffect) return null;
-    const x = solveUnit(u => confAtVolume(u, m), targetConf * 100, CAP);
+    const x = crossingFor(observedUplift, m);
     return x ? Math.max(1, Math.ceil(x)) : null;
   });
 
-  // X range: far enough that the slowest crossing is visible with padding
-  const maxCross = visCrossings.reduce((mx, c) => c ? Math.max(mx, c) : mx, crossUnit || 30);
-  const endVis = Math.min(Math.max(10, Math.ceil(maxCross * 1.3)), horizon);
-  const visUnits = unitGrid(endVis);
+  const endVis = horizon;
+  const visUnits = units;
 
   // Curve datasets
   const curveDatasets = visMultipliers.map((m, i) => {
     return {
-      label: `${Math.round(fTotal * m).toLocaleString()} / unit`,
-      data: visUnits.map(u => hasEffect ? confAtVolume(u, m) : null),
+      label: `${m}× traffic`,
+      data: visUnits.map(u => confAtVolume(u, m)),
       borderColor: visColors[i],
       backgroundColor: 'transparent',
-      tension: 0.4, pointRadius: 0,
+      tension: 0, pointRadius: 0,
       borderWidth: m === 1 ? 2.5 : 1.5,
       borderDash: m === 1 ? [] : m < 1 ? [4, 3] : [],
       fill: false, order: 10 + i,
     };
   });
 
-  // Vertical crossing-point lines: each is a two-point segment at x = crossUnit
-  // rendered as a scatter with showLine:true connecting {x, 0} → {x, targetConf*100}
   const crossingDatasets = visMultipliers.map((m, i) => {
     const cu = visCrossings[i];
-    if (!cu) return null;
+    if (!cu || cu > horizon) return null;
     return {
       label: `_cross_${i}`,   // leading _ = hidden from legend via filter below
-      data: [{ x: cu, y: 0 }, { x: cu, y: targetConf * 100 }],
+      data: [{ x: cu, y: 1 }, { x: cu, y: 1 - targetConf }],
       borderColor: visColors[i] + 'aa',
       backgroundColor: 'transparent',
       borderWidth: 1.5,
@@ -623,13 +659,15 @@ function renderCharts() {
     data: {
       datasets: [
         {
-          label: `Target ${fmt(targetConf*100, targetConf*100 >= 99 ? 1 : 0)}%`,
-          data: visUnits.map(u => ({ x: u, y: targetConf * 100 })),
+          label: `Threshold · p ≤ ${pText(1-targetConf)}`,
+          data: visUnits.map(u => ({ x: u, y: 1 - targetConf })),
           borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 99,
         },
         ...curveDatasets.map(ds => ({ ...ds, data: ds.data.map((y, i) => ({ x: visUnits[i], y })) })),
         ...crossingDatasets,
+        { label: `Now · day ${since}`, data: [{ x: since, y: plotP(evidenceAt(since)) }],
+          backgroundColor: '#c79a4f', borderColor: '#c79a4f', pointRadius: 6, showLine: false, order: 1 },
       ]
     },
     options: {
@@ -639,16 +677,16 @@ function renderCharts() {
         legend: {
           position: 'top',
           labels: {
-            boxWidth: 12, padding: 14, font: { size: 11 },
+            boxWidth: 10, padding: 8, font: { size: 10 },
             filter: item => !item.text.startsWith('_'),
           }
         },
         tooltip: {
           callbacks: {
-            title: items => (items.length ? `Unit ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
+            title: items => (items.length ? `Day ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
             label: c => {
               if (c.dataset.label.startsWith('_')) return null;
-              return c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(1)}%` : null;
+              return c.parsed.y !== null ? `${c.dataset.label}: p ${pText(c.parsed.y)}` : null;
             },
           },
           filter: item => !item.dataset.label.startsWith('_'),
@@ -657,22 +695,23 @@ function renderCharts() {
       scales: {
         x: {
           type: 'linear',
-          title: { display: true, text: 'Time units', font: { size: 11 } },
+          title: { display: true, text: 'Day since test start', font: { size: 11 } },
           ticks: { maxTicksLimit: 12, font: { size: 10 } },
-          min: 1,
+          min: since, max: endVis,
         },
         y: {
-          title: { display: true, text: '1 − p (%) - not confidence', font: { size: 11 } },
-          min: 0, max: 100,
-          ticks: { font: { size: 10 } }
+          type: 'logarithmic', reverse: true,
+          title: { display: true, text: 'p-value (log scale)', font: { size: 11 } },
+          min: 0.000001, max: 1,
+          ticks: { font: { size: 10 }, callback: value => Number(value).toExponential(0) }
         }
       }
     }
   });
 
-  const confCrossDataset = crossUnit ? [{
+  const confCrossDataset = crossUnit && crossUnit <= horizon ? [{
     label: '_conf_cross',
-    data: [{ x: crossUnit, y: 0 }, { x: crossUnit, y: targetConf * 100 }],
+    data: [{ x: crossUnit, y: 1 }, { x: crossUnit, y: 1 - targetConf }],
     borderColor: 'rgba(78,158,126,0.7)',
     backgroundColor: 'transparent',
     borderWidth: 1.5,
@@ -689,21 +728,27 @@ function renderCharts() {
     data: {
       datasets: [
         {
-          label: `Projected 1 − p (${fmt(expectedUplift*100,1)}% assumed uplift)`,
-          data: units.map(u => ({ x: u, y: confAt(u) })),
+          label: `Same pace (${fmt(observedUplift*100,3)}%)`,
+          data: units.map(u => ({ x: u, y: plotP(evidenceAt(u)) })),
           borderColor: '#4f78d6',
           backgroundColor: 'rgba(79,120,214,0.08)',
-          fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2, order: 10,
+          fill: false, tension: 0, pointRadius: 0, borderWidth: 2, order: 10,
         },
+        ...[0.5, 2].map((factor, index) => ({
+          label: `${factor === 0.5 ? 'Half' : 'Double'} effect (${fmt(observedUplift*factor*100,3)}%)`,
+          data: units.map(day => ({ x: day, y: plotP(evidenceAt(day, observedUplift*factor)) })),
+          borderColor: ['#cf6b6b', '#4e9e7e'][index], borderDash: [4, 3],
+          fill: false, tension: 0, pointRadius: 0, borderWidth: 1.5,
+        })),
         {
-          label: `Target ${fmt(targetConf*100, targetConf*100 >= 99 ? 1 : 0)}%`,
-          data: units.map(u => ({ x: u, y: targetConf * 100 })),
+          label: `Threshold · p ≤ ${pText(1-targetConf)}`,
+          data: units.map(u => ({ x: u, y: 1 - targetConf })),
           borderColor: '#4e9e7e', borderWidth: 2, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 20,
         },
         {
-          label: `Now (unit ${since})`,
-          data: [{ x: since, y: confAtSince }],
+          label: `Now · day ${since}`,
+          data: [{ x: since, y: plotP(evidenceAt(since)) }],
           borderColor: 'rgba(199,154,79,0.8)',
           backgroundColor: '#c79a4f',
           pointRadius: 6, pointHoverRadius: 8,
@@ -719,16 +764,16 @@ function renderCharts() {
         legend: {
           position: 'top',
           labels: {
-            boxWidth: 12, padding: 14, font: { size: 11 },
+            boxWidth: 10, padding: 8, font: { size: 10 },
             filter: item => !item.text.startsWith('_'),
           }
         },
         tooltip: {
           callbacks: {
-            title: items => (items.length ? `Unit ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
+            title: items => (items.length ? `Day ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
             label: c => {
               if (c.dataset.label.startsWith('_')) return null;
-              return c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` : null;
+              return c.parsed.y !== null ? `${c.dataset.label}: p ${pText(c.parsed.y)}` : null;
             },
           },
           filter: item => !item.dataset.label.startsWith('_'),
@@ -737,14 +782,15 @@ function renderCharts() {
       scales: {
         x: {
           type: 'linear',
-          title: { display: true, text: 'Time units since test start', font: { size: 11 } },
+          title: { display: true, text: 'Day since test start', font: { size: 11 } },
           ticks: { maxTicksLimit: 12, font: { size: 10 } },
-          min: 1,
+          min: since, max: end,
         },
         y: {
-          title: { display: true, text: '1 − p (%) - not confidence', font: { size: 11 } },
-          min: 0, max: 100,
-          ticks: { font: { size: 10 } }
+          type: 'logarithmic', reverse: true,
+          title: { display: true, text: 'p-value (log scale)', font: { size: 11 } },
+          min: 0.000001, max: 1,
+          ticks: { font: { size: 10 }, callback: value => Number(value).toExponential(0) }
         }
       }
     }
