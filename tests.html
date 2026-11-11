@@ -55,6 +55,8 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(close(forecastP(0, observedUplift * 2, 2), forecastP(0)), 'Future uplift and traffic never rewrite current evidence');
     assert(forecastP(6, observedUplift * 2) < forecastP(6) && forecastP(6, observedUplift * 0.5) > forecastP(6), 'Future effect scenarios use cumulative conversions');
     assert(forecastP(6, observedUplift, 2) < forecastP(6) && forecastP(6, observedUplift, 0.5) > forecastP(6), 'Traffic scenarios change only future visitors');
+    const sameStart = calculator.projectedPValue(306636, 164621, 305750, 163222, 306636 / 30, 305750 / 30, 0, 0.1, 2);
+    assert(close(sameStart, forecastP(0)), 'All effect scenarios start from the same measured p-value');
     assert(forecastP(1000, observedUplift, 1, 1) > 0.99, 'Negative uplift never signals a one-sided increase');
     assert(calculator.projectedPValue(0, 0, 10, 1, 1, 1, 0, 0.1, 2) === null && calculator.projectedPValue(10, 9, 10, 9, 1, 1, 1, 1, 2) === null, 'Invalid samples and impossible binary future rates rejected');
     const doc = calculator.document;

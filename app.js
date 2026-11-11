@@ -600,58 +600,35 @@ function renderCharts() {
         <span class="scen-stat-val" title="Conditional extrapolation, not a probability or stopping rule. Future traffic and conversion rates are held constant. With several variants, the comparison with the largest current p-value is shown; thresholds are Bonferroni-adjusted.">${crossingText(crossExact)}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">Half / double future uplift</span>
-        <span class="scen-stat-val">${crossingText(crossingFor(observedUplift*0.5))} / ${crossingText(crossingFor(observedUplift*2))}</span>
+        <span class="scen-stat-label">Alternative effect scenarios</span>
+        <span class="scen-stat-val">No effect · observed · planned · 2× planned</span>
       </div>`;
   } else {
     statEl.innerHTML = `<div class="scen-stat"><span class="scen-stat-label">Add a variant with conversions to see the projection.</span></div>`;
   }
 
-  // ── Traffic sensitivity chart ──────────────────────────────────────────────
-  const visMultipliers = [0.25, 0.5, 1, 1.5, 2];
-  const visColors      = ['#cf6b6b', '#c79a4f', '#4f78d6', '#7c3aed', '#4e9e7e'];
-  const confAtVolume = (u, m) => plotP(evidenceAt(u, observedUplift, m));
-
-  // Pre-compute crossing unit for each volume
-  const visCrossings = visMultipliers.map(m => {
-    const x = crossingFor(observedUplift, m);
-    return x ? Math.max(1, Math.ceil(x)) : null;
-  });
-
+  // ── Future effect scenarios ───────────────────────────────────────────────
+  const scenarioEffects = [
+    { label: 'No future effect (0%)', uplift: 0, color: '#7c8798', dash: [3, 3] },
+    { label: `Observed pace (${fmt(observedUplift*100,3)}%)`, uplift: observedUplift, color: '#4f78d6', dash: [] },
+    { label: `Planned effect (${fmt(upliftRaw,1)}%)`, uplift: expectedUplift, color: '#4e9e7e', dash: [6, 3] },
+    { label: `2× planned (${fmt(expectedUplift*200,1)}%)`, uplift: expectedUplift * 2, color: '#c79a4f', dash: [2, 3] },
+  ].filter((scenario, index, scenarios) => scenarios.findIndex(item => Math.abs(item.uplift - scenario.uplift) < 0.0000001) === index);
   const endVis = horizon;
   const visUnits = units;
 
-  // Curve datasets
-  const curveDatasets = visMultipliers.map((m, i) => {
+  const scenarioDatasets = scenarioEffects.map((scenario, index) => {
     return {
-      label: `${m}× traffic`,
-      data: visUnits.map(u => confAtVolume(u, m)),
-      borderColor: visColors[i],
+      label: scenario.label,
+      data: visUnits.map(day => plotP(evidenceAt(day, scenario.uplift))),
+      borderColor: scenario.color,
       backgroundColor: 'transparent',
       tension: 0, pointRadius: 0,
-      borderWidth: m === 1 ? 2.5 : 1.5,
-      borderDash: m === 1 ? [] : m < 1 ? [4, 3] : [],
-      fill: false, order: 10 + i,
+      borderWidth: scenario.uplift === observedUplift ? 2.5 : 1.5,
+      borderDash: scenario.dash,
+      fill: false, order: 10 + index,
     };
   });
-
-  const crossingDatasets = visMultipliers.map((m, i) => {
-    const cu = visCrossings[i];
-    if (!cu || cu > horizon) return null;
-    return {
-      label: `_cross_${i}`,   // leading _ = hidden from legend via filter below
-      data: [{ x: cu, y: 1 }, { x: cu, y: 1 - targetConf }],
-      borderColor: visColors[i] + 'aa',
-      backgroundColor: 'transparent',
-      borderWidth: 1.5,
-      borderDash: [3, 3],
-      pointRadius: [0, 5],
-      pointBackgroundColor: visColors[i],
-      pointBorderColor: 'transparent',
-      showLine: true, fill: false,
-      tension: 0, order: 5 + i,
-    };
-  }).filter(Boolean);
 
   if (cVis) cVis.destroy();
   cVis = new Chart(document.getElementById('cVis'), {
@@ -664,8 +641,7 @@ function renderCharts() {
           borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 99,
         },
-        ...curveDatasets.map(ds => ({ ...ds, data: ds.data.map((y, i) => ({ x: visUnits[i], y })) })),
-        ...crossingDatasets,
+        ...scenarioDatasets.map(ds => ({ ...ds, data: ds.data.map((y, i) => ({ x: visUnits[i], y })) })),
         { label: `Now · day ${since}`, data: [{ x: since, y: plotP(evidenceAt(since)) }],
           backgroundColor: '#c79a4f', borderColor: '#c79a4f', pointRadius: 6, showLine: false, order: 1 },
       ]
@@ -710,7 +686,7 @@ function renderCharts() {
   });
 
   const confCrossDataset = crossUnit && crossUnit <= horizon ? [{
-    label: '_conf_cross',
+    label: `Target day ${crossUnit}`,
     data: [{ x: crossUnit, y: 1 }, { x: crossUnit, y: 1 - targetConf }],
     borderColor: 'rgba(78,158,126,0.7)',
     backgroundColor: 'transparent',
@@ -728,18 +704,12 @@ function renderCharts() {
     data: {
       datasets: [
         {
-          label: `Same pace (${fmt(observedUplift*100,3)}%)`,
+          label: `Same observed pace (${fmt(observedUplift*100,3)}%)`,
           data: units.map(u => ({ x: u, y: plotP(evidenceAt(u)) })),
           borderColor: '#4f78d6',
           backgroundColor: 'rgba(79,120,214,0.08)',
           fill: false, tension: 0, pointRadius: 0, borderWidth: 2, order: 10,
         },
-        ...[0.5, 2].map((factor, index) => ({
-          label: `${factor === 0.5 ? 'Half' : 'Double'} effect (${fmt(observedUplift*factor*100,3)}%)`,
-          data: units.map(day => ({ x: day, y: plotP(evidenceAt(day, observedUplift*factor)) })),
-          borderColor: ['#cf6b6b', '#4e9e7e'][index], borderDash: [4, 3],
-          fill: false, tension: 0, pointRadius: 0, borderWidth: 1.5,
-        })),
         {
           label: `Threshold · p ≤ ${pText(1-targetConf)}`,
           data: units.map(u => ({ x: u, y: 1 - targetConf })),
