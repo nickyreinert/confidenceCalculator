@@ -6,6 +6,7 @@
 <title>Confidence Calculator - A/B Test Calculator</title>
 <meta name="description" content="A simple confidence calculator for A/B tests. Calculate confidence levels, p-values, power, uplift, visitor needs and Bonferroni-adjusted thresholds without pretending you need to be a data scientist.">
 <link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/svg+xml" href="assets/unicorn.svg">
 <script>
 (function(){const t=new URLSearchParams(location.search).get('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);})();
 </script>
@@ -83,6 +84,10 @@
     </div>
 
     <div class="gs-header">
+      <div class="fg test-name">
+        <label for="testName">Test name</label>
+        <input type="text" id="testName" placeholder="e.g. Checkout unicorn" oninput="updateTestName()">
+      </div>
       <div class="fg traffic-total">
         <label>Overall Visitors</label>
         <div class="traffic-row">
@@ -105,7 +110,7 @@
           <label class="radio-pill"><input type="radio" name="sConf" value="0.9999" onchange="recalc()"><span>99.99%</span></label>
           <label class="radio-pill"><input type="radio" name="sConf" value="0.99999" onchange="recalc()"><span>99.999%</span></label>
         </div>
-        <small class="conf-alpha-hint" id="significanceLevelHint">Significance level: 5% (set by confidence level, not adjustable separately).</small>
+        <small class="conf-alpha-hint" id="significanceLevelHint">p-value threshold: 0.0500 (5%; set by confidence level).</small>
       </div>
       <div class="radio-group">
         <span class="radio-label">Test type <button class="help-btn" data-tooltip="Two-tailed checks increases and decreases. One-tailed tests an increase only: choose the direction before collecting data." onclick="openConcept('althypothesis')">?</button></span>
@@ -219,6 +224,14 @@
 
     </div>
 
+    <div class="p-chart-controls proj-hidden" id="pChartControls">
+      <label for="pChartScale">p-value chart scale</label>
+      <select id="pChartScale" onchange="onPChartScaleChange()">
+        <option value="linear">Linear</option>
+        <option value="logarithmic">Logarithmic</option>
+      </select>
+      <button type="button" class="help-btn" aria-label="About p-value charts and scales" data-tooltip="Both scales show the same p-values. Linear uses equal steps; logarithmic spreads out small values. Lower p-values mean stronger evidence against no effect." onclick="openConcept('pvalue')">?</button>
+    </div>
     <!-- Projection section -->
     <section class="section projection-section proj-hidden" id="secProjection">
       <div class="scen-stat-row" id="scenStatRow"></div>
@@ -226,7 +239,7 @@
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
-              <div class="chart-box-title" title="One conditional forecast: current conversion rates and traffic continue at the observed pace. The vertical marker is the estimated day the p-value crosses the selected threshold. This is not a stopping rule.">When could the result become significant?</div>
+              <div class="chart-box-title" title="One conditional forecast: current conversion rates and traffic continue at the observed pace. The vertical marker is the estimated day the p-value crosses the selected threshold. This is not a stopping rule.">Projected p-value <button type="button" class="help-btn" aria-label="About projected p-values" onclick="openConcept('pvalue')">?</button></div>
             </div>
             <button class="chart-copy-btn" onclick="copyChart('cConf')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
@@ -237,7 +250,7 @@
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
-              <div class="scen-chart-title" title="All lines start at the actual current visitor and conversion counts. Only the assumed future variant effect changes; traffic stays at the current pace.">Effect scenarios from today</div>
+              <div class="scen-chart-title" title="All lines start at the actual current visitor and conversion counts. Only the assumed future variant effect changes; traffic stays at the current pace.">p-value by effect scenario <button type="button" class="help-btn" aria-label="About p-value scenarios" onclick="openConcept('pvalue')">?</button></div>
             </div>
             <button class="chart-copy-btn" onclick="copyChart('cVis')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
@@ -253,7 +266,7 @@
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
-              <div class="scen-chart-title">Visitors needed by power</div>
+              <div class="scen-chart-title">Visitors needed by power <button type="button" class="help-btn" aria-label="About statistical power" onclick="openConcept('power')">?</button></div>
             </div>
             <button class="chart-copy-btn" onclick="copyChart('cPowerVis')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
@@ -265,7 +278,7 @@
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">
-              <div class="scen-chart-title">Power over time</div>
+              <div class="scen-chart-title">Power over time <button type="button" class="help-btn" aria-label="About statistical power" onclick="openConcept('power')">?</button></div>
             </div>
             <button class="chart-copy-btn" onclick="copyChart('cPowerTime')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
@@ -311,7 +324,7 @@
           </div>
           <div class="chart-box">
             <div class="chart-box-header">
-              <div class="chart-title-group"><div class="scen-chart-title">Observed evidence over time (1 − p)</div></div>
+              <div class="chart-title-group"><div class="scen-chart-title">p-value over time <button type="button" class="help-btn" aria-label="About p-values over time" onclick="openConcept('pvalue')">?</button></div></div>
               <button class="chart-copy-btn" onclick="copyChart('cDeepConf')" aria-label="Copy chart image" title="Copy chart">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
               </button>

@@ -49,7 +49,7 @@ function zTest(n1, c1, n2, c2) {
 }
 
 function pFromZ(z, tails) {
-  return Math.max(0, Math.min(1, tails === 1 ? 1 - normalCDF(z) : 2 * (1 - normalCDF(Math.abs(z)))));
+  return Math.max(0, Math.min(1, tails === 1 ? normalCDF(-z) : 2 * normalCDF(-Math.abs(z))));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,6 +262,52 @@ function v(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 function fmt(n, d=2) { return isFinite(n) ? n.toFixed(d) : '-'; }
 function fmtPct(n) { return fmt(n*100,2)+'%'; }
 
+function formatPValue(p) {
+  if (!Number.isFinite(p)) return 'Unavailable';
+  if (p < 0.000001) return '< 0.000001';
+  return p.toFixed(p < 0.0001 ? 6 : 4);
+}
+
+function pValueText(p) {
+  const text = formatPValue(p);
+  return `p-value ${text.startsWith('<') ? '' : '= '}${text}`;
+}
+
+function pValueHelp() {
+  return `<button type="button" class="help-btn" aria-label="About the p-value and significance" data-tooltip="${CONCEPTS.pvalue.tooltip}" onclick="openConcept('pvalue')">?</button>`;
+}
+
+function pChartScale() {
+  return document.getElementById('pChartScale').value;
+}
+
+function plotPValue(p) {
+  return p === null ? null : pChartScale() === 'logarithmic' ? Math.max(0.000001, p) : p;
+}
+
+function pValueAxis() {
+  const logarithmic = pChartScale() === 'logarithmic';
+  return {
+    type: pChartScale(), reverse: true,
+    title: { display: true, text: `p-value (${logarithmic ? 'log' : 'linear'} scale)`, font: { size: 11 } },
+    min: logarithmic ? 0.000001 : 0, max: 1,
+    ticks: { font: { size: 10 }, callback: value => Number(value).toFixed(6).replace(/\.?0+$/, '') || '0' },
+  };
+}
+
+function onPChartScaleChange() {
+  chartsDirty = true;
+  renderCharts();
+  renderDeepDive();
+  if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
+}
+
+function updateTestName() {
+  const name = document.getElementById('testName').value.trim();
+  document.title = name ? `${name} - Confidence Calculator` : 'Confidence Calculator - A/B Test Calculator';
+  if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
+}
+
 function renderEffectInterval(interval) {
   if (!interval || interval.uplift === null) return '<span class="effect-unavailable" aria-label="Interval undefined" data-tooltip="Relative uplift needs at least one control conversion.">-</span>';
   const { lower, upper, uplift } = interval;
@@ -295,7 +341,7 @@ function recalc() {
   const alphaPct   = alpha * 100;
   const alphaDecimals = alphaPct >= 1 ? 0 : alphaPct >= 0.1 ? 1 : alphaPct >= 0.01 ? 2 : 3;
   const significanceHint = document.getElementById('significanceLevelHint');
-  if (significanceHint) significanceHint.textContent = `Significance level: ${fmt(alphaPct, alphaDecimals)}% (set by confidence level, not adjustable separately).`;
+  if (significanceHint) significanceHint.textContent = `p-value threshold: ${formatPValue(alpha)} (${fmt(alphaPct, alphaDecimals)}%; set by confidence level).`;
   const nVar       = variants.length;
 
   const adjAlpha = alpha / Math.max(1, nVar);
@@ -351,7 +397,7 @@ function recalc() {
     <div class="result-card ${cardCls}">
       <div class="rc-head">
         <span class="rc-title">Result</span>
-        <span class="rc-compact">p = ${fmt(pVal,4)}</span>
+        <span class="rc-compact">${pValueText(pVal)} ${pValueHelp()}</span>
         <span class="badge ${badgeCls}">${badgeTxt}</span>
       </div>
 
@@ -361,7 +407,7 @@ function recalc() {
           <strong class="effect-value ${upCls}">${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'undefined'}</strong>
         </div>
         <div class="effect-metric">
-          <span class="effect-label">Interval <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower bound' : 'confidence interval'}${nVar > 1 ? ' (Bonferroni-adjusted)' : ''}. ${CONCEPTS.interval.tooltip}" onclick="openConcept('interval')">?</button></span>
+          <span class="effect-label">Confidence interval <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower bound' : 'confidence interval'}${nVar > 1 ? ' (Bonferroni-adjusted)' : ''}. ${CONCEPTS.interval.tooltip}" onclick="openConcept('interval')">?</button></span>
           ${renderEffectInterval(interval)}
         </div>
       </div>
@@ -395,7 +441,7 @@ function recalc() {
         </div>
         <div class="cc-step cc-out" id="significance-${vr.id}">
           <span class="cc-key cc-key--out">p-value (${tails===2?'two':'one'}-tailed) <button class="help-btn" data-tooltip="${CONCEPTS.pvalue.tooltip}" onclick="openConcept('pvalue')">?</button></span>
-          <span class="cc-val cc-val--out">${fmt(pVal,4)}</span>
+          <span class="cc-val cc-val--out">${formatPValue(pVal)}</span>
         </div>
 
         <div class="cc-divider"></div>
@@ -405,8 +451,8 @@ function recalc() {
           <span class="cc-val cc-val--result">${+(targetConf*100).toFixed(5)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">α${nVar > 1 ? ' (Bonferroni)' : ''} <button class="help-btn" data-tooltip="The selected α is divided by the number of comparisons. Compare the observed p-value with this threshold." onclick="openConcept('bonferroni')">?</button></span>
-          <span class="cc-val cc-val--result">${fmt(adjAlpha*100,5)}%</span>
+          <span class="cc-key cc-key--result">p-value threshold${nVar > 1 ? ' (Bonferroni)' : ''} ${pValueHelp()}</span>
+          <span class="cc-val cc-val--result">${formatPValue(adjAlpha)}</span>
         </div>
 
         <div class="cc-divider"></div>
@@ -556,8 +602,8 @@ function renderCharts() {
   const horizon = Math.max(since * 4, 100);
   const end = horizon;
   const units = [since, ...unitGrid(end).filter(day => day > since)];
-  const plotP = p => p === null ? null : Math.max(0.000001, p);
-  const pText = p => p === null ? 'Unavailable' : p === 0 ? '< 1e-12' : p < 0.0001 ? p.toExponential(2) : fmt(p, 4);
+  const plotP = plotPValue;
+  const pText = formatPValue;
   const direction = observedUplift < 0 ? 'decrease' : 'increase';
   const crossingText = crossing => crossing === null || crossing > horizon ? `Not within ${horizon - since} more days`
     : crossing <= since ? `Significant ${direction}` : `Day ${Math.ceil(crossing)} (+${Math.ceil(crossing) - since} days)`;
@@ -576,20 +622,12 @@ function renderCharts() {
 
     statEl.innerHTML = `
       <div class="scen-stat">
-        <span class="scen-stat-label">Control Conversion rate</span>
-        <span class="scen-stat-val">${fmtPct(p1)}</span>
-      </div>
-      <div class="scen-stat">
-        <span class="scen-stat-label">Observed uplift · ${forecastVariant.label}</span>
-        <span class="scen-stat-val">${observedUplift > 0 ? '+' : ''}${fmt(observedUplift*100,3)}%</span>
-      </div>
-      <div class="scen-stat">
         <span class="scen-stat-label">Traffic basis</span>
         <span class="scen-stat-val" title="Traffic per time unit used for everything after now">${basisTxt}</span>
       </div>
       <div class="scen-stat">
-        <span class="scen-stat-label">${evidenceAt(since) <= 1-targetConf ? `Significant ${direction}` : 'Not significant'} · day ${since}</span>
-        <span class="scen-stat-val ${confAtSince >= targetConf*100 ? (observedUplift < 0 ? 'neg' : 'pos') : ''}">p ${pText(evidenceAt(since))} / α ${pText(1-targetConf)}</span>
+        <span class="scen-stat-label">${forecastVariant.label} · day ${since} ${pValueHelp()}</span>
+        <span class="scen-stat-val ${confAtSince >= targetConf*100 ? (observedUplift < 0 ? 'neg' : 'pos') : ''}">${pValueText(evidenceAt(since))} · threshold ${pText(1-targetConf)}</span>
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">Power ${fmt(power*100,0)}% · assumed ${fmt(upliftRaw,1)}% effect</span>
@@ -598,10 +636,6 @@ function renderCharts() {
       <div class="scen-stat">
         <span class="scen-stat-label">Same pace · significant ${direction}</span>
         <span class="scen-stat-val" title="Conditional extrapolation, not a probability or stopping rule. Future traffic and conversion rates are held constant. With several variants, the comparison with the largest current p-value is shown; thresholds are Bonferroni-adjusted.">${crossingText(crossExact)}</span>
-      </div>
-      <div class="scen-stat">
-        <span class="scen-stat-label">Alternative effect scenarios</span>
-        <span class="scen-stat-val">No effect · observed · planned · 2× planned</span>
       </div>`;
   } else {
     statEl.innerHTML = `<div class="scen-stat"><span class="scen-stat-label">Add a variant with conversions to see the projection.</span></div>`;
@@ -636,7 +670,7 @@ function renderCharts() {
     data: {
       datasets: [
         {
-          label: `Threshold · p ≤ ${pText(1-targetConf)}`,
+          label: `p-value threshold = ${pText(1-targetConf)}`,
           data: visUnits.map(u => ({ x: u, y: 1 - targetConf })),
           borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 99,
@@ -662,7 +696,10 @@ function renderCharts() {
             title: items => (items.length ? `Day ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
             label: c => {
               if (c.dataset.label.startsWith('_')) return null;
-              return c.parsed.y !== null ? `${c.dataset.label}: p ${pText(c.parsed.y)}` : null;
+              if (c.parsed.y === null) return null;
+              const p = c.datasetIndex === 0 ? 1 - targetConf :
+                evidenceAt(c.parsed.x, scenarioEffects[c.datasetIndex - 1]?.uplift ?? observedUplift);
+              return `${c.dataset.label}: ${pValueText(p)}`;
             },
           },
           filter: item => !item.dataset.label.startsWith('_'),
@@ -675,12 +712,7 @@ function renderCharts() {
           ticks: { maxTicksLimit: 12, font: { size: 10 } },
           min: since, max: endVis,
         },
-        y: {
-          type: 'logarithmic', reverse: true,
-          title: { display: true, text: 'p-value (log scale)', font: { size: 11 } },
-          min: 0.000001, max: 1,
-          ticks: { font: { size: 10 }, callback: value => Number(value).toExponential(0) }
-        }
+        y: pValueAxis()
       }
     }
   });
@@ -711,7 +743,7 @@ function renderCharts() {
           fill: false, tension: 0, pointRadius: 0, borderWidth: 2, order: 10,
         },
         {
-          label: `Threshold · p ≤ ${pText(1-targetConf)}`,
+          label: `p-value threshold = ${pText(1-targetConf)}`,
           data: units.map(u => ({ x: u, y: 1 - targetConf })),
           borderColor: '#4e9e7e', borderWidth: 2, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 20,
@@ -743,7 +775,7 @@ function renderCharts() {
             title: items => (items.length ? `Day ${Math.round(items[0].parsed.x).toLocaleString()}` : ''),
             label: c => {
               if (c.dataset.label.startsWith('_')) return null;
-              return c.parsed.y !== null ? `${c.dataset.label}: p ${pText(c.parsed.y)}` : null;
+              return c.parsed.y !== null ? `${c.dataset.label}: ${pValueText(c.datasetIndex === 1 || c.datasetIndex === 3 ? c.parsed.y : evidenceAt(c.parsed.x))}` : null;
             },
           },
           filter: item => !item.dataset.label.startsWith('_'),
@@ -756,12 +788,7 @@ function renderCharts() {
           ticks: { maxTicksLimit: 12, font: { size: 10 } },
           min: since, max: end,
         },
-        y: {
-          type: 'logarithmic', reverse: true,
-          title: { display: true, text: 'p-value (log scale)', font: { size: 11 } },
-          min: 0.000001, max: 1,
-          ticks: { font: { size: 10 }, callback: value => Number(value).toExponential(0) }
-        }
+        y: pValueAxis()
       }
     }
   });
@@ -982,6 +1009,9 @@ document.getElementById('scSinceDate').max = localDateStr(new Date());
 
 function buildStateParams() {
   const p = new URLSearchParams();
+  const name = document.getElementById('testName').value.trim();
+  if (name) p.set('name', name);
+  p.set('scale', pChartScale());
   p.set('vis',   document.getElementById('sTotalVis').value);
   p.set('conf',  document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
   p.set('pwr',   document.querySelector('input[name="sPower"]:checked')?.value || '0.80');
@@ -1027,6 +1057,11 @@ let _restoring = false;
 
 function restoreFromParams() {
   const p = new URLSearchParams(location.search);
+  document.getElementById('testName').value = p.get('name') || '';
+  document.getElementById('pChartScale').value = p.get('scale') === 'logarithmic' ? 'logarithmic' : 'linear';
+  _restoring = true;
+  updateTestName();
+  _restoring = false;
   if (!p.has('vis')) return false;
 
   _restoring = true;
@@ -1130,6 +1165,7 @@ function copyChart(chartId) {
 
 function toggleProjection(show, skipHistory) {
   const hidden = !show;
+  document.getElementById('pChartControls').classList.toggle('proj-hidden', !show && !deepEnabled());
   document.getElementById('secProjection')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerChartsRow')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerRadioGroup')?.classList.toggle('proj-hidden', hidden);

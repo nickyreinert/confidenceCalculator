@@ -119,6 +119,7 @@ function deepRecentRates() {
 // ── Toggle + render ─────────────────────────────────────────────────────────
 
 function toggleDeepDive(show, skipHistory) {
+  document.getElementById('pChartControls').classList.toggle('proj-hidden', !show && !document.getElementById('projToggle').checked);
   ['deepSidebar', 'deepSidebarLabel', 'deepSection'].forEach(id =>
     document.getElementById(id)?.classList.toggle('proj-hidden', !show));
   if (!show) document.getElementById('deepBreakdowns')?.classList.add('proj-hidden');
@@ -299,12 +300,12 @@ function renderDeepCharts() {
     },
   });
 
-  // Actual confidence over time (cumulative)
+  // Cumulative p-values use the same scale as the projection charts.
   const confData = gi => dates.map((_, i) => {
     const n1 = cum[0].n[i], n2 = cum[gi].n[i];
     if (n1 < 1 || n2 < 1) return null;
     const { z } = zTest(n1, cum[0].c[i], n2, cum[gi].c[i]);
-    return (1 - pFromZ(z, tails)) * 100;
+    return pFromZ(z, tails);
   });
   if (cDeepConf) cDeepConf.destroy();
   cDeepConf = new Chart(document.getElementById('cDeepConf'), {
@@ -313,13 +314,13 @@ function renderDeepCharts() {
       labels,
       datasets: [
         ...groups.slice(1).map((g, i) => ({
-          label: g.label, data: confData(i + 1),
+          label: g.label, data: confData(i + 1).map(plotPValue),
           borderColor: groupColor(i + 1), backgroundColor: 'transparent',
           borderWidth: 2, pointRadius: 0, tension: 0.2, spanGaps: true,
         })),
         {
-          label: `Threshold ${fmt(adjConf * 100, adjConf * 100 >= 99 ? 1 : 0)}%`,
-          data: dates.map(() => adjConf * 100),
+          label: `p-value threshold = ${formatPValue(1 - adjConf)}`,
+          data: dates.map(() => 1 - adjConf),
           borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false,
         },
       ],
@@ -327,10 +328,14 @@ function renderDeepCharts() {
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend, tooltip: { callbacks: { label: c => c.raw === null ? null : `${c.dataset.label}: ${fmt(c.raw, 2)}%` } } },
+      plugins: { legend, tooltip: { callbacks: { label: c => {
+        if (c.raw === null) return null;
+        const p = c.datasetIndex === groups.length - 1 ? 1 - adjConf : confData(c.datasetIndex + 1)[c.dataIndex];
+        return `${c.dataset.label}: ${pValueText(p)}`;
+      } } } },
       scales: {
         x: { ticks: xTicks, grid: { display: false } },
-        y: { min: 0, max: 100, title: { display: true, text: '1 − p (%) - not confidence', font: { size: 11 } }, ticks: { font: { size: 10 } } },
+        y: pValueAxis(),
       },
     },
   });
@@ -441,7 +446,7 @@ function renderBreakdown() {
   const maxVis = Math.max(1, ...rows.map(r => sum(r.n)));
   const head = { weekday: 'Weekday', dom: 'Day', month: 'Month' }[mode];
   const variantsHead = groups.slice(1).map(g =>
-    `<th class="num">${escapeHtml(g.label)} rate</th><th class="num">Uplift</th><th class="num">1 − p (not confidence)</th>`).join('');
+    `<th class="num">${escapeHtml(g.label)} rate</th><th class="num">Uplift</th><th class="num">p-value ${pValueHelp()}</th>`).join('');
 
   el.innerHTML = `
     <table class="bd-table">
@@ -455,8 +460,8 @@ function renderBreakdown() {
           if (!(r.n[0] > 0 && r.n[gi] > 0 && p1 > 0)) return '<td class="num">-</td><td class="num">-</td><td class="num">-</td>';
           const up = p2 / p1 - 1;
           const { z } = zTest(r.n[0], r.c[0], r.n[gi], r.c[gi]);
-          const conf = (1 - pFromZ(z, tails)) * 100;
-          return `<td class="num">${fmtPct(p2)}</td><td class="num ${up > 0 ? 'pos' : up < 0 ? 'neg' : ''}">${signPct(up)}</td><td class="num bd-muted">${fmt(conf, 0)}%</td>`;
+          const p = pFromZ(z, tails);
+          return `<td class="num">${fmtPct(p2)}</td><td class="num ${up > 0 ? 'pos' : up < 0 ? 'neg' : ''}">${signPct(up)}</td><td class="num bd-muted">${formatPValue(p)}</td>`;
         }).join('');
         return `<tr>
           <td>${escapeHtml(r.label)}</td>

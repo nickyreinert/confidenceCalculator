@@ -34,12 +34,21 @@ const CONCEPTS = {
   },
   pvalue: {
     label: 'p-value',
-    tooltip: 'How compatible your observed data is with “no real effect”. Lower p-value means stronger evidence against the null hypothesis.',
+    tooltip: 'If there were no real effect, how often would a difference at least this extreme occur? Lower p-values mean stronger evidence. Compare with the p-value threshold.',
     deep: `
       <p>The p-value estimates how compatible your observed data is with the assumption that there is no real effect.</p>
       <p>In other words: if the null hypothesis were true, how surprising would a difference this large be?</p>
       <p><strong>p = 0.04</strong> means: if there were truly no difference, random sampling would produce a gap this large only 4% of the time.</p>
       <p>The significance level is the threshold; the p-value is the result. The p-value must be below your significance level before you reject the null hypothesis.</p>
+      <h4>Different names, different jobs</h4>
+      <ul>
+        <li><strong>p-value:</strong> the result calculated from visitors, conversions and test direction. Changing target power or confidence level does not change it.</li>
+        <li><strong>p-value threshold (significance level, alpha):</strong> the cutoff for calling a result statistically significant. A 95% confidence level sets this to 0.05; multiple variants divide that cutoff between comparisons.</li>
+        <li><strong>Confidence level:</strong> the chosen long-run coverage of the interval, not a measured probability of winning.</li>
+        <li><strong>Confidence interval:</strong> the uncertainty range around uplift. For a matching two-sided test it excludes zero exactly when the p-value is below the threshold.</li>
+      </ul>
+      <p><strong>Very small values:</strong> we show <code>p-value &lt; 0.000001</code> rather than rounding to zero or using scientific notation. Several different inputs can all fall below this display limit. The calculation still uses the unrounded value.</p>
+      <p><strong>Chart scales:</strong> linear uses equal numerical steps. Logarithmic spreads out small p-values; values below 0.000001 sit at the chart floor, but tooltips still report them as below the display limit. Both scales show the same test result. Lower is stronger evidence, not a smaller uplift.</p>
       <p>IF there is NO REAL EFFECT, a 5% significance level means about 5 out of 100 comparable experiments would falsely report a statistically significant difference. This error rate requires a preplanned test, not repeatedly checking and stopping at significance.</p>
       <h4>Common misconceptions</h4>
       <ul>

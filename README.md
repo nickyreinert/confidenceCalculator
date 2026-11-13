@@ -4,6 +4,8 @@ Compare A/B test results, see how each version is doing, and plan what to test n
 
 New sessions start with one control and one variant, calculation details off, and projection and deep dive hidden. Shared links retain their explicit settings. Uplift intervals use a number line with a zero marker, observed-effect point and endpoint labels; explanations are available through the `?` buttons.
 
+Give the test a **Test name** above Overall Visitors to include it in the share URL and browser-tab title. Names and chart-scale preferences round-trip in shared links. The tab uses a custom unicorn favicon.
+
 [**Open the calculator →**](https://confidence.nickyreinert.de)
 
 ![The calculator comparing a control with a variant](assets/confidence-calculator.jpg)
@@ -38,7 +40,7 @@ Turn on **Deep dive** in the header and import one row per group and day - e.g. 
 ![Deep dive with checks, daily traffic, confidence and uplift over time](assets/deep-dive.jpg)
 
 - **Checks:** split changing over time, fading effect, full weeks, traffic piling up on a few days
-- **Charts:** traffic per day, actual confidence over time, uplift over time
+- **Charts:** traffic per day, p-value over time, uplift over time
 - **Breakdowns:** weekday, day of month, month
 - **Better projections:** based on the last 7, 14 or 28 days (or all days) instead of the average since the start
 
@@ -68,12 +70,14 @@ Zero visitors, negative counts, fractional counts and empty inputs cannot produc
 
 Power is an approximate normal-model planning calculation using the **separately chosen** relevant effect and the control rate as the baseline estimate. It integrates the alternative distribution beyond the matching pooled-test cutoff, including both rejection tails for a two-sided test. Bonferroni is applied to power planning too. The target power is distinct from calculated power at current sample sizes. The assumed effect defaults to +10% and is never automatically replaced with observed uplift; existing shared `scupl` values still restore unchanged.
 
-The retained evidence-projection charts plot **1 - p**, explicitly labelled as not confidence. They are conditional scenarios, not probabilities of winning or a license to stop at a crossing. Adequate power does not establish sufficient calendar duration; plan business cycles and a stopping rule in advance.
+Projection and daily-history charts consistently plot **p-value**, with a shared **Linear / Logarithmic** scale selector (linear by default). Lower means stronger evidence against no effect. Logarithmic charts floor values below 0.000001 for plotting only; tooltips retain the below-limit label. Projections are conditional scenarios, not probabilities of winning or a license to stop at a crossing. Adequate power does not establish sufficient calendar duration; plan business cycles and a stopping rule in advance.
+
+Very small p-values display as **< 0.000001**, never a rounded zero or scientific notation. Normal tail probabilities are evaluated directly, avoiding cancellation from subtracting a near-one CDF. Decisions use the unrounded p-value. The **p-value threshold** is the significance level (alpha), set by the selected confidence level and adjusted for multiple variants; it is not the measured p-value. The adjacent help buttons explain these distinctions and the confidence interval.
 
 ## Regression tests
 
 Open [tests.html](tests.html) through the same static host as the calculator, or serve this directory with `python3 -m http.server 8000` and visit `http://localhost:8000/tests.html`. No build step or test dependencies are needed; the application still loads Chart.js from its existing CDN. The test page reports PASS/FAIL and sets `document.documentElement.dataset.tests` to `passed` or `failed`.
 
-Coverage includes numerical interval regressions, confidence-level changes, swapped groups, 1,350 test/interval consistency checks (unequal samples, boundary rates, count metrics and Bonferroni), invalid/zero counts, one-sided direction, power behavior, independent planning assumptions, visible results in compact mode, help-sidebar access, fresh-start defaults and shared-link settings. For responsive inspection, resize the test iframe or open the calculator at a mobile viewport.
+Coverage includes numerical interval regressions, confidence-level changes, swapped groups, 1,350 test/interval consistency checks (unequal samples, boundary rates, count metrics and Bonferroni), invalid/zero counts, one-sided direction, power behavior, independent planning assumptions, visible results in compact mode, help-sidebar access, fresh-start defaults, tiny-p-value precision and display, linear/log switching across charts, compact projection summaries and named shared-link round trips. For responsive inspection, resize the test iframe or open the calculator at a mobile viewport.
 
 **Note:** A 95% confidence method covers the fixed true effect in about 95% of newly calculated intervals over repeated experiments. It is not a 95% probability the variant wins or that today's uplift will repeat. Not significant does not establish no effect.
