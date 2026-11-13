@@ -66,11 +66,53 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(forecastP(1000, observedUplift, 1, 1) > 0.99, 'Negative uplift never signals a one-sided increase');
     assert(calculator.projectedPValue(0, 0, 10, 1, 1, 1, 0, 0.1, 2) === null && calculator.projectedPValue(10, 9, 10, 9, 1, 1, 1, 1, 2) === null, 'Invalid samples and impossible binary future rates rejected');
     const doc = calculator.document;
+    for (const id of ['confidence', 'interval', 'pvalue', 'nullhypothesis', 'althypothesis', 'zscore', 'uplift', 'power', 'bonferroni', 'chartScale']) {
+      calculator.openConcept(id);
+      const firstExplanation = doc.querySelector('#sidebarBody > p').textContent;
+      assert(firstExplanation.includes('95% confidence') && firstExplanation.includes('alpha') &&
+        firstExplanation.includes('p-value') && firstExplanation.includes('statistically significant'),
+        `${id} help starts with the connection between confidence, alpha, p-value and significance`);
+    }
+    calculator.closeSidebar();
+    const confidenceHelp = doc.querySelector('[data-concept="confidence"]');
+    confidenceHelp.dispatchEvent(new calculator.MouseEvent('mouseover', { bubbles: true }));
+    assert(doc.querySelector('.tip').textContent.startsWith('95% confidence') &&
+      doc.querySelector('.tip').textContent.includes('p-value below alpha'), 'Static help tooltips lead with the same statistical relationship');
+    confidenceHelp.dispatchEvent(new calculator.MouseEvent('mouseout', { bubbles: true }));
+    for (const [confidence, adjusted] of [
+      ['0.90', '95%'], ['0.95', '97.5%'], ['0.99', '99.5%'],
+      ['0.999', '99.95%'], ['0.9999', '99.995%'], ['0.99999', '99.9995%'],
+    ]) {
+      const option = doc.querySelector(`input[name="sConf"][value="${confidence}"]`);
+      option.click();
+      assert(doc.getElementById('bfTargetConf').textContent === option.nextElementSibling.textContent &&
+        doc.getElementById('bfAlpha').textContent === adjusted &&
+        calculator.getComputedStyle(doc.getElementById('bonferroniAlert')).display !== 'none',
+        `Multiple-variant notice matches sidebar precision and shows the stricter level at ${option.nextElementSibling.textContent}`);
+    }
+    doc.querySelector('input[name="sConf"][value="0.95"]').click();
     for (const [from, to, backwards] of [['ctrl-n', 'ctrl-c', false], ['ctrl-c', 'v0-n', false], ['v0-n', 'v0-c', false], ['v0-c', 'v1-n', false], ['v1-n', 'v0-c', true], ['v0-n', 'ctrl-c', true]]) {
+      const target = doc.getElementById(to);
+      let selected = false;
+      const select = target.select;
+      target.select = function () { selected = true; select.call(this); };
       doc.getElementById(from).focus();
       doc.getElementById(from).dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'Tab', shiftKey: backwards, bubbles: true, cancelable: true }));
       assert(doc.activeElement.id === to, `Data-entry Tab order: ${from} to ${to}`);
+      assert(selected, `Tab selects the full destination value: ${from} to ${to}`);
+      target.select = select;
     }
+    const nameField = doc.getElementById('testName');
+    nameField.value = 'Checkout test';
+    doc.getElementById('ctrl-n').focus();
+    doc.dispatchEvent(new calculator.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    nameField.focus();
+    assert(nameField.selectionStart === 0 && nameField.selectionEnd === nameField.value.length, 'Native Tab focus selects the full test name');
+    doc.getElementById('ctrl-n').focus();
+    nameField.setSelectionRange(2, 2);
+    doc.dispatchEvent(new calculator.PointerEvent('pointerdown', { bubbles: true }));
+    nameField.focus();
+    assert(nameField.selectionStart === 2 && nameField.selectionEnd === 2, 'Pointer focus preserves caret placement');
     const assumed = doc.getElementById('scUplift').value;
     doc.getElementById('v0-c').value = 250;
     calculator.recalc();
@@ -122,13 +164,16 @@ document.getElementById('calculator').addEventListener('load', async () => {
     calculator.recalc();
     calculator.toggleProjection(true, true);
     assert(!doc.getElementById('secProjection').classList.contains('proj-hidden'), 'Projection toggle shows the whole section');
+    const scaleSwitch = doc.getElementById('pChartScale');
+    assert(scaleSwitch.type === 'checkbox' && scaleSwitch.closest('.calc-toggle') &&
+      scaleSwitch.closest('#projectionMetrics') && doc.getElementById('scenStatRow').closest('#projectionMetrics'),
+      'Chart scale uses the common switch inside the metrics strip');
     const chart = id => calculator.Chart.getChart(doc.getElementById(id));
     assert(chart('cConf').options.scales.y.type === 'linear' && chart('cVis').options.scales.y.min === 0, 'p-value charts default to an unfloored linear scale');
     assert(doc.getElementById('scenStatRow').querySelectorAll('.scen-stat').length === 4 &&
       !doc.getElementById('scenStatRow').textContent.includes('Control Conversion rate') &&
       !doc.getElementById('scenStatRow').textContent.includes('Observed uplift'), 'Projection summary omits repeated rate, uplift and scenario legend');
-    doc.getElementById('pChartScale').value = 'logarithmic';
-    calculator.onPChartScaleChange();
+    scaleSwitch.click();
     assert(chart('cConf').options.scales.y.type === 'logarithmic' && chart('cVis').options.scales.y.min === 0.000001 &&
       calculator.buildStateParams().get('scale') === 'logarithmic', 'Scale switch updates both projection charts and share URL');
     assert(calculator.plotPValue(exampleP) === 0.000001 && !chart('cConf').options.scales.y.ticks.callback(0.000001).includes('e-'), 'Log floor is plotting-only and axis ticks use decimals');
@@ -142,13 +187,15 @@ document.getElementById('calculator').addEventListener('load', async () => {
     calculator.toggleDeepDive(true, true);
     assert(chart('cDeepConf').options.scales.y.type === 'logarithmic' &&
       close(chart('cDeepConf').data.datasets[0].data[0], calculator.pFromZ(calculator.zTest(1000, 100, 1000, 150).z, 2)), 'Daily-history chart uses the same p-value metric and scale');
-    doc.getElementById('pChartScale').value = 'linear';
-    calculator.onPChartScaleChange();
+    scaleSwitch.click();
     assert(chart('cDeepConf').options.scales.y.type === 'linear' && chart('cConf').options.scales.y.type === 'linear' &&
       calculator.plotPValue(exampleP) === exampleP, 'Switching back to linear restores unrounded p-values in all charts');
     calculator.setDeepData(null);
+    calculator.toggleProjection(false, true);
+    assert(!doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Metrics switch remains available with deep dive alone');
     doc.getElementById('deepToggle').checked = false;
     calculator.toggleDeepDive(false, true);
+    assert(doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Metrics strip hides when both chart sections are off');
     const testName = 'Checkout & "Unicorn" <test> 🦄';
     doc.getElementById('testName').value = testName;
     calculator.updateTestName();
@@ -170,6 +217,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(defaults.getElementById('calcToggle').dataset.state === 'off' && defaults.getElementById('groupsGrid').classList.contains('calc-collapsed'), 'Fresh start uses the simplest calculator');
     assert(!defaults.getElementById('projToggle').checked && !defaults.getElementById('deepToggle').checked && defaults.getElementById('secProjection').classList.contains('proj-hidden') && defaults.getElementById('projectionSidebar').classList.contains('proj-hidden'), 'Fresh start hides projection, planning inputs and deep dive');
     assert(defaults.querySelectorAll('.group-col:not(.group-col--add)').length === 2, 'Fresh start contains only control and one variant');
+    assert(defaults.getElementById('bonferroniAlert').style.display === 'none', 'One variant does not show a multiple-comparison adjustment');
     const sharedLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
     defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1&name=Checkout+%26+Unicorn&scale=logarithmic';
     await sharedLoaded;
@@ -177,7 +225,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(shared.getElementById('calcToggle').dataset.state === 'full' && shared.getElementById('projToggle').checked && shared.getElementById('deepToggle').checked && !shared.getElementById('secProjection').classList.contains('proj-hidden'), 'Explicit shared options override simple starting defaults');
     assert(shared.getElementById('testName').value === 'Checkout & Unicorn' &&
       shared.title === 'Checkout & Unicorn - Confidence Calculator' &&
-      shared.getElementById('pChartScale').value === 'logarithmic', 'Shared links restore the test name, browser title and chart scale');
+      shared.getElementById('pChartScale').checked, 'Shared links restore the test name, browser title and chart scale');
     defaultsFrame.remove();
     results.push('All checks passed.');
     document.documentElement.dataset.tests = 'passed';

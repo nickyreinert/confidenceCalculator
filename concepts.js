@@ -1,4 +1,9 @@
-// Each entry: id, tooltip (1-2 sentences), deep (full HTML for sidebar body)
+const SIGNIFICANCE_HELP = {
+  tooltip: '95% confidence means accepting a 5% false-alarm risk when no real effect exists: this is alpha (0.05). A p-value below alpha is statistically significant. With more variants, alpha is divided between comparisons.',
+  deep: `<p><strong>How these fit together:</strong> Confidence level is your chosen setting for judging significance. For one variant, 95% confidence means accepting a 5% false-alarm risk when no real effect exists in a preplanned test. This 5% is the <strong>significance level</strong>, called <strong>alpha</strong> (0.05). The <strong>p-value</strong> comes from your data: below alpha means statistically significant; at or above alpha means not significant. With more variants, alpha is divided between comparisons. A matching two-sided confidence interval excludes zero exactly when that test is significant. This is not a probability that the variant wins, and confidence is not 1 minus the p-value.</p>`,
+};
+
+// Each entry: id, tooltip, deep (full HTML for sidebar body)
 const CONCEPTS = {
   confidence: {
     label: 'Confidence Level',
@@ -34,7 +39,7 @@ const CONCEPTS = {
   },
   pvalue: {
     label: 'p-value',
-    tooltip: 'If there were no real effect, how often would a difference at least this extreme occur? Lower p-values mean stronger evidence. Compare with the p-value threshold.',
+    tooltip: 'If there were no real effect, how often would a difference at least this extreme occur? Lower p-values mean stronger evidence. Compare with the significance level (alpha).',
     deep: `
       <p>The p-value estimates how compatible your observed data is with the assumption that there is no real effect.</p>
       <p>In other words: if the null hypothesis were true, how surprising would a difference this large be?</p>
@@ -43,7 +48,7 @@ const CONCEPTS = {
       <h4>Different names, different jobs</h4>
       <ul>
         <li><strong>p-value:</strong> the result calculated from visitors, conversions and test direction. Changing target power or confidence level does not change it.</li>
-        <li><strong>p-value threshold (significance level, alpha):</strong> the cutoff for calling a result statistically significant. A 95% confidence level sets this to 0.05; multiple variants divide that cutoff between comparisons.</li>
+        <li><strong>Significance level (alpha):</strong> the cutoff for calling a result statistically significant. A 95% confidence level sets this to 0.05; multiple variants divide that cutoff between comparisons.</li>
         <li><strong>Confidence level:</strong> the chosen long-run coverage of the interval, not a measured probability of winning.</li>
         <li><strong>Confidence interval:</strong> the uncertainty range around uplift. For a matching two-sided test it excludes zero exactly when the p-value is below the threshold.</li>
       </ul>
@@ -73,13 +78,13 @@ const CONCEPTS = {
     deep: `
       <p>The alternative hypothesis says: <em>"The test will have an effect on the conversion rate."</em></p>
       <p>A test can have two effects: the conversion rate can increase or decrease. A <strong>two-tailed</strong> test assumes both directions are possible.</p>
-      <p>A <strong>one-tailed</strong> test assumes only one direction is possible. It needs less data and reaches confidence faster, but there is a catch: if the effect goes the other way, you will not see it because it is not part of the calculation.</p>
+      <p>A <strong>one-tailed</strong> test checks only the chosen direction. It can detect an increase with less data, but a decrease will not count as a significant result in this increase-only test.</p>
       <p>Use one-tailed only when you can honestly commit to one direction before the test starts.</p>
     `
   },
   zscore: {
     label: 'Z-Score',
-    tooltip: 'Signal-to-noise ratio. Above ~1.96 = 95% confidence in a two-tailed test.',
+    tooltip: 'The z-score measures signal relative to noise and is converted to the p-value. For one variant in a two-sided test, an absolute z-score above about 1.96 gives a p-value below 0.05.',
     deep: `
       <p>The z-score measures how many standard errors the observed difference sits away from zero.</p>
       <p>Formula: <code>z = (p₂ − p₁) / SE</code>, where SE is the pooled standard error.</p>
@@ -131,9 +136,15 @@ const CONCEPTS = {
       <p>If you compare multiple variants against one control group, the chance of seeing at least one seemingly significant result purely by chance increases. I mean, there are so many colors.</p>
       <p>The <strong>Bonferroni correction</strong> reduces that Type-I error risk by dividing the significance level α by the number of comparisons:</p>
       <p><code>α_adjusted = α / number_of_variants</code></p>
-      <p>The adjusted significance level is then used instead of the original one when evaluating each variant. That raises the confidence threshold for everyone.</p>
+      <p>For example, selecting <strong>99.99%</strong> confidence with two variants gives each interval <strong>99.995%</strong> confidence. The extra digit is the multiple-variant adjustment, not a change to your sidebar selection or an added zero.</p>
+      <p>The adjusted significance level is then used instead of the original one when evaluating each variant. That makes statistical significance harder to reach for everyone.</p>
       <p>It is conservative and can miss real effects, but it is straightforward and easy to explain. When you have only one variant, no correction is applied.</p>
     `
+  },
+  chartScale: {
+    label: 'Chart scale',
+    tooltip: 'Linear uses equal steps; logarithmic spreads out small p-values. The scale changes the view, not the result.',
+    deep: `<p><strong>Linear</strong> uses equal numerical steps. <strong>Logarithmic</strong> spreads out small p-values, making differences near zero easier to see. Lower p-values mean stronger evidence against no effect, not a smaller uplift.</p><p>The switch changes all p-value charts together, but does not change any calculation or significance decision. On the logarithmic scale, values below 0.000001 sit at the chart floor; tooltips still identify them as below that display limit.</p>`,
   },
   splitStability: {
     label: 'Split stability',
@@ -163,3 +174,8 @@ const CONCEPTS = {
     `
   }
 };
+
+for (const id of ['confidence', 'interval', 'pvalue', 'nullhypothesis', 'althypothesis', 'zscore', 'uplift', 'power', 'bonferroni', 'chartScale']) {
+  CONCEPTS[id].tooltip = `${SIGNIFICANCE_HELP.tooltip} ${CONCEPTS[id].tooltip}`;
+  CONCEPTS[id].deep = SIGNIFICANCE_HELP.deep + CONCEPTS[id].deep;
+}

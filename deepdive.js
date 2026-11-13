@@ -119,7 +119,7 @@ function deepRecentRates() {
 // ── Toggle + render ─────────────────────────────────────────────────────────
 
 function toggleDeepDive(show, skipHistory) {
-  document.getElementById('pChartControls').classList.toggle('proj-hidden', !show && !document.getElementById('projToggle').checked);
+  document.getElementById('projectionMetrics').classList.toggle('proj-hidden', !show && !document.getElementById('projToggle').checked);
   ['deepSidebar', 'deepSidebarLabel', 'deepSection'].forEach(id =>
     document.getElementById(id)?.classList.toggle('proj-hidden', !show));
   if (!show) document.getElementById('deepBreakdowns')?.classList.add('proj-hidden');
@@ -319,7 +319,7 @@ function renderDeepCharts() {
           borderWidth: 2, pointRadius: 0, tension: 0.2, spanGaps: true,
         })),
         {
-          label: `p-value threshold = ${formatPValue(1 - adjConf)}`,
+          label: `Significance level (alpha) = ${formatPValue(1 - adjConf)}`,
           data: dates.map(() => 1 - adjConf),
           borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false,
         },

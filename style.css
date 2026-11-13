@@ -621,7 +621,7 @@ header p {
 .fg .hint{font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)}
 
 /* ── Sunken input / select ── */
-.fg input,.fg select,.p-chart-controls select {
+.fg input,.fg select {
   height:40px;
   padding:0 var(--space-3);
   border:none;
@@ -638,7 +638,7 @@ header p {
   -webkit-appearance:none;
   cursor:pointer;
 }
-.fg input:focus,.fg select:focus,.p-chart-controls select:focus {
+.fg input:focus,.fg select:focus {
   box-shadow:var(--nm-sunken-md), inset 0 0 0 1.5px var(--accent), inset 0 0 10px var(--accent-glow);
 }
 
@@ -937,10 +937,15 @@ header p {
   overflow:hidden;
 }
 .test-name{margin-bottom:var(--space-4)}
-.p-chart-controls{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3);font-size:var(--text-xs)}
-.p-chart-controls select{width:auto}
+.scen-stat-items{display:contents}
+.p-chart-controls .calc-toggle{padding:0;gap:var(--space-2)}
+.p-chart-controls .calc-toggle-label{color:var(--text-strong);min-width:6ch}
+.p-chart-controls .calc-toggle:has(input:checked) .calc-toggle-label{color:var(--accent-strong)}
+.p-chart-controls input:not(:checked) ~ .calc-toggle-label .scale-log,
+.p-chart-controls input:checked ~ .calc-toggle-label .scale-linear{display:none}
+.p-chart-controls .calc-toggle:has(input:focus-visible) .calc-toggle-track{outline:2px solid var(--accent);outline-offset:3px}
 .scen-stat{display:flex;flex-direction:column;gap:2px;padding:var(--space-2) var(--space-4);border-right:1px solid var(--border-hair)}
-.scen-stat:last-child{border-right:none;flex:1}
+.scen-stat-row > .scen-stat:last-child{border-right:none;flex:1}
 .scen-stat--wide{grid-column:span 1}
 .scen-stat-label{font-size:var(--text-2xs);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--text-faint)}
 .scen-stat-val{font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-strong)}
@@ -1072,7 +1077,7 @@ header p {
 
   .scen-stat-row{grid-template-columns:1fr}
   .scen-stat{border-right:none;border-bottom:1px solid var(--border-hair);padding:var(--space-2) var(--space-3)}
-  .scen-stat:last-child{border-bottom:none}
+  .scen-stat-row > .scen-stat:last-child{border-bottom:none}
 }
 
 /* ── Paste import dialog ── */

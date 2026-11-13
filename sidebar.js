@@ -30,8 +30,9 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeSidebar();
 });
 
-// ── Floating tooltip for all [data-tooltip] elements ──────────────────────────
+// ── Floating tooltip for concept help and custom explanations ────────────────
 (function initTooltip() {
+  const selector = '[data-tooltip], [data-concept]';
   const tip = document.createElement('div');
   tip.className = 'tip';
   document.body.appendChild(tip);
@@ -39,7 +40,7 @@ document.addEventListener('keydown', e => {
   let current = null;
 
   function show(el) {
-    const text = el.getAttribute('data-tooltip');
+    const text = CONCEPTS[el.dataset.concept]?.tooltip || el.getAttribute('data-tooltip');
     if (!text) return;
     current = el;
     tip.textContent = text;
@@ -66,14 +67,14 @@ document.addEventListener('keydown', e => {
 
   // Use event delegation so dynamically injected buttons (result cards) work too
   document.addEventListener('mouseover', e => {
-    const el = e.target.closest('[data-tooltip]');
+    const el = e.target.closest(selector);
     if (el && el !== current) show(el);
   });
   document.addEventListener('mouseout', e => {
-    if (e.target.closest('[data-tooltip]')) hide();
+    if (e.target.closest(selector)) hide();
   });
   document.addEventListener('click', e => {
-    if (e.target.closest('[data-tooltip]')) hide();
+    if (e.target.closest(selector)) hide();
   });
   document.addEventListener('scroll', hide, true);
 })();

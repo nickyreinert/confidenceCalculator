@@ -65,6 +65,22 @@ function allGroupIds() {
   return ['ctrl', ...variants.map(vr => vr.id)];
 }
 
+(function initTabSelection() {
+  let tabbing = false;
+  document.addEventListener('keydown', event => {
+    tabbing = event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey;
+  }, true);
+  document.addEventListener('pointerdown', () => { tabbing = false; }, true);
+  document.addEventListener('focusin', event => {
+    const field = event.target;
+    if (tabbing && (field instanceof HTMLTextAreaElement ||
+      field instanceof HTMLInputElement && ['text', 'number', 'search', 'url', 'email', 'tel', 'password'].includes(field.type))) {
+      field.select();
+    }
+    tabbing = false;
+  });
+})();
+
 document.getElementById('groupsGrid').addEventListener('keydown', event => {
   if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
   const fields = allGroupIds().flatMap(id => ['n', 'c'].map(suffix => document.getElementById(`${id}-${suffix}`)));
@@ -278,7 +294,7 @@ function pValueHelp() {
 }
 
 function pChartScale() {
-  return document.getElementById('pChartScale').value;
+  return document.getElementById('pChartScale').checked ? 'logarithmic' : 'linear';
 }
 
 function plotPValue(p) {
@@ -341,21 +357,17 @@ function recalc() {
   const alphaPct   = alpha * 100;
   const alphaDecimals = alphaPct >= 1 ? 0 : alphaPct >= 0.1 ? 1 : alphaPct >= 0.01 ? 2 : 3;
   const significanceHint = document.getElementById('significanceLevelHint');
-  if (significanceHint) significanceHint.textContent = `p-value threshold: ${formatPValue(alpha)} (${fmt(alphaPct, alphaDecimals)}%; set by confidence level).`;
+  if (significanceHint) significanceHint.textContent = `Significance level (alpha): ${fmt(alphaPct, alphaDecimals)}%. A p-value below ${formatPValue(alpha)} is significant for one variant.`;
   const nVar       = variants.length;
 
   const adjAlpha = alpha / Math.max(1, nVar);
   const adjConf  = 1 - adjAlpha;
   const bfEl = document.getElementById('bonferroniAlert');
-  if (nVar > 1 && (adjConf - targetConf) > 0.00001) {
+  if (nVar > 1) {
     bfEl.style.display = 'block';
-    const adjPct = adjConf * 100;
-    const adjDecimals = adjPct >= 99.99 ? 4 : adjPct >= 99.9 ? 3 : adjPct >= 99 ? 2 : 1;
-    const tPct = targetConf * 100;
-    const targetDecimals = tPct % 1 === 0 ? 0 : tPct % 0.1 < 0.001 ? 1 : tPct % 0.01 < 0.0001 ? 2 : tPct % 0.001 < 0.00001 ? 3 : 4;
     document.getElementById('bfCount').textContent = nVar;
-    document.getElementById('bfTargetConf').textContent = fmt(targetConf*100, targetDecimals)+'%';
-    document.getElementById('bfAlpha').textContent = fmt(adjPct, adjDecimals)+'%';
+    document.getElementById('bfTargetConf').textContent = +(targetConf*100).toFixed(5)+'%';
+    document.getElementById('bfAlpha').textContent = +(adjConf*100).toFixed(5)+'%';
   } else {
     bfEl.style.display = 'none';
   }
@@ -407,7 +419,7 @@ function recalc() {
           <strong class="effect-value ${upCls}">${Number.isFinite(uplift) ? upSign + fmt(uplift*100,2) + '%' : 'undefined'}</strong>
         </div>
         <div class="effect-metric">
-          <span class="effect-label">Confidence interval <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower bound' : 'confidence interval'}${nVar > 1 ? ' (Bonferroni-adjusted)' : ''}. ${CONCEPTS.interval.tooltip}" onclick="openConcept('interval')">?</button></span>
+          <span class="effect-label">Confidence interval <button type="button" class="help-btn" aria-label="About the confidence interval" data-tooltip="${CONCEPTS.interval.tooltip} Selected interval: ${+(adjConf*100).toFixed(5)}% ${tails === 1 ? 'one-sided lower bound' : 'confidence interval'}${nVar > 1 ? ' (Bonferroni-adjusted)' : ''}." onclick="openConcept('interval')">?</button></span>
           ${renderEffectInterval(interval)}
         </div>
       </div>
@@ -447,11 +459,11 @@ function recalc() {
         <div class="cc-divider"></div>
 
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">Selected confidence level <button class="help-btn" data-tooltip="Long-run coverage of newly calculated intervals, not a probability that the variant wins." onclick="openConcept('confidence')">?</button></span>
+          <span class="cc-key cc-key--result">Selected confidence level <button class="help-btn" data-tooltip="${CONCEPTS.confidence.tooltip}" onclick="openConcept('confidence')">?</button></span>
           <span class="cc-val cc-val--result">${+(targetConf*100).toFixed(5)}%</span>
         </div>
         <div class="cc-step cc-result">
-          <span class="cc-key cc-key--result">p-value threshold${nVar > 1 ? ' (Bonferroni)' : ''} ${pValueHelp()}</span>
+          <span class="cc-key cc-key--result">Significance level (alpha)${nVar > 1 ? ' (Bonferroni)' : ''} ${pValueHelp()}</span>
           <span class="cc-val cc-val--result">${formatPValue(adjAlpha)}</span>
         </div>
 
@@ -627,7 +639,7 @@ function renderCharts() {
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">${forecastVariant.label} · day ${since} ${pValueHelp()}</span>
-        <span class="scen-stat-val ${confAtSince >= targetConf*100 ? (observedUplift < 0 ? 'neg' : 'pos') : ''}">${pValueText(evidenceAt(since))} · threshold ${pText(1-targetConf)}</span>
+        <span class="scen-stat-val ${confAtSince >= targetConf*100 ? (observedUplift < 0 ? 'neg' : 'pos') : ''}">${pValueText(evidenceAt(since))} · alpha ${pText(1-targetConf)}</span>
       </div>
       <div class="scen-stat">
         <span class="scen-stat-label">Power ${fmt(power*100,0)}% · assumed ${fmt(upliftRaw,1)}% effect</span>
@@ -670,7 +682,7 @@ function renderCharts() {
     data: {
       datasets: [
         {
-          label: `p-value threshold = ${pText(1-targetConf)}`,
+          label: `Significance level (alpha) = ${pText(1-targetConf)}`,
           data: visUnits.map(u => ({ x: u, y: 1 - targetConf })),
           borderColor: '#4e9e7e', borderWidth: 1.5, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 99,
@@ -743,7 +755,7 @@ function renderCharts() {
           fill: false, tension: 0, pointRadius: 0, borderWidth: 2, order: 10,
         },
         {
-          label: `p-value threshold = ${pText(1-targetConf)}`,
+          label: `Significance level (alpha) = ${pText(1-targetConf)}`,
           data: units.map(u => ({ x: u, y: 1 - targetConf })),
           borderColor: '#4e9e7e', borderWidth: 2, borderDash: [6, 4],
           pointRadius: 0, fill: false, order: 20,
@@ -1058,7 +1070,7 @@ let _restoring = false;
 function restoreFromParams() {
   const p = new URLSearchParams(location.search);
   document.getElementById('testName').value = p.get('name') || '';
-  document.getElementById('pChartScale').value = p.get('scale') === 'logarithmic' ? 'logarithmic' : 'linear';
+  document.getElementById('pChartScale').checked = p.get('scale') === 'logarithmic';
   _restoring = true;
   updateTestName();
   _restoring = false;
@@ -1165,7 +1177,7 @@ function copyChart(chartId) {
 
 function toggleProjection(show, skipHistory) {
   const hidden = !show;
-  document.getElementById('pChartControls').classList.toggle('proj-hidden', !show && !deepEnabled());
+  document.getElementById('projectionMetrics').classList.toggle('proj-hidden', !show && !deepEnabled());
   document.getElementById('secProjection')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerChartsRow')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerRadioGroup')?.classList.toggle('proj-hidden', hidden);

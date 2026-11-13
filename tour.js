@@ -36,11 +36,11 @@ const TOUR_STEPS = [
   {
     target: [() => $tour('#confRadios')?.closest('.radio-group')],
     sidebar: true,
-    title: 'p-value threshold',
+    title: 'Confidence and significance',
     text: () => {
       const confidence = Number(document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
       const alphaPct = Number(((1 - confidence) * 100).toFixed(5));
-      return `The <strong>p-value threshold</strong> (also called significance level or alpha) is <strong>${alphaPct}%</strong>. Compare the measured p-value with this cutoff; a lower p-value is statistically significant. If there is truly no effect, about ${alphaPct} out of 100 comparable, preplanned tests would incorrectly detect one. The selected confidence level sets this cutoff (alpha = 1 - confidence level); it does not change the measured p-value.`;
+      return `For one variant, your <strong>${Number((confidence * 100).toFixed(5))}% confidence level</strong> sets a <strong>${alphaPct}% significance level (alpha)</strong>: the accepted false-alarm risk when no real effect exists in a preplanned test. The <strong>p-value</strong> comes from your data; below alpha means statistically significant. With more variants, alpha is divided between comparisons. Changing confidence changes alpha, not the measured p-value.`;
     },
   },
   {
