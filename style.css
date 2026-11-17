@@ -141,12 +141,14 @@ h1,h2,h3,h4{color:var(--text-strong);font-weight:var(--fw-bold);line-height:var(
 }
 
 /* ── Header ── */
+:root{--sticky-header-h:86px}
+@media(max-width:1100px){:root{--sticky-header-h:138px}}
 header {
   background:linear-gradient(145deg,var(--n-800) 0%,var(--n-850) 100%);
   color:#e7eaf2;
   padding:var(--space-5) var(--space-6);
-  position:relative;
-  overflow:hidden;
+  position:sticky;top:0;z-index:40;
+  overflow:visible;
 }
 header::before {
   content:'';
@@ -175,6 +177,11 @@ header p {
 .header-link:hover{color:var(--n-100);border-color:var(--n-100)}
 
 .header-actions{display:flex;align-items:center;gap:var(--space-2);flex-shrink:0;position:relative}
+.new-tab-btn{margin-left:auto;text-decoration:none}
+@media(max-width:1100px){
+  .header-inner{flex-direction:column;align-items:flex-start}
+  .header-actions{width:100%;flex-wrap:wrap}
+}
 
 /* ── Calc toggle switch ── */
 .calc-toggle {
@@ -340,33 +347,6 @@ header p {
 }
 .share-toast--visible{opacity:1;transform:translateY(0)}
 
-/* ── Sticky jump navigation ── */
-:root{--nav-h:42px}
-.jump-nav {
-  position:sticky;top:0;z-index:30;
-  height:var(--nav-h);
-  display:flex;align-items:center;gap:var(--space-1);
-  padding:0 var(--space-6);
-  background:var(--surface-raised);
-  border-bottom:1px solid var(--border-hair);
-  box-shadow:0 4px 12px rgba(0,0,0,0.06);
-  overflow-x:auto;scrollbar-width:none;
-}
-.jump-nav::-webkit-scrollbar{display:none}
-.jump-nav a {
-  flex-shrink:0;
-  padding:5px 12px;
-  border-radius:var(--radius-pill);
-  font-family:var(--font-mono);font-size:var(--text-2xs);font-weight:var(--fw-medium);
-  letter-spacing:var(--ls-wider);text-transform:uppercase;
-  color:var(--text-muted);text-decoration:none;
-  transition:color var(--dur-fast),background var(--dur-fast),box-shadow var(--dur-fast);
-}
-.jump-nav a:hover{color:var(--text-strong)}
-.jump-nav a.is-active{color:var(--accent);background:var(--surface-sunken);box-shadow:var(--nm-sunken-sm)}
-.jump-nav a[hidden]{display:none}
-#groupsGrid,.projection-section,#powerChartsRow{scroll-margin-top:calc(var(--nav-h) + var(--space-4))}
-
 /* ── Dashboard grid ── */
 .dashboard {
   display:grid;
@@ -383,9 +363,9 @@ header p {
   padding:var(--space-4);
   display:flex;flex-direction:column;gap:var(--space-3);
   min-height:calc(100vh - 68px);
-  position:sticky;top:var(--nav-h);
+  position:sticky;top:var(--sticky-header-h);
   overflow-y:auto;
-  max-height:calc(100vh - var(--nav-h));
+  max-height:calc(100vh - var(--sticky-header-h));
   overflow-x:hidden;
 }
 
@@ -938,14 +918,12 @@ header p {
 }
 .test-name{margin-bottom:var(--space-4)}
 .scen-stat-items{display:contents}
-.p-chart-controls{display:flex;justify-content:flex-end;margin-bottom:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--surface-sunken);border-radius:var(--radius-md);box-shadow:var(--nm-sunken-sm)}
-.p-chart-controls > .scen-stat{flex-direction:row;align-items:center;gap:var(--space-3);padding:0;border-right:none}
-.p-chart-controls .calc-toggle{padding:0;gap:var(--space-2)}
-.p-chart-controls .calc-toggle-label{color:var(--text-strong);min-width:6ch}
-.p-chart-controls .calc-toggle:has(input:checked) .calc-toggle-label{color:var(--accent-strong)}
-.p-chart-controls input:not(:checked) ~ .calc-toggle-label .scale-log,
-.p-chart-controls input:checked ~ .calc-toggle-label .scale-linear{display:none}
-.p-chart-controls .calc-toggle:has(input:focus-visible) .calc-toggle-track{outline:2px solid var(--accent);outline-offset:3px}
+.p-chart-scale-toggle{position:relative;padding:0;gap:var(--space-2)}
+.p-chart-scale-toggle .calc-toggle-label{color:var(--text-strong);min-width:10ch}
+.p-chart-scale-toggle:has(input:checked) .calc-toggle-label{color:var(--accent-strong)}
+.p-chart-scale-toggle input:not(:checked) ~ .calc-toggle-label .scale-log,
+.p-chart-scale-toggle input:checked ~ .calc-toggle-label .scale-linear{display:none}
+.p-chart-scale-toggle:has(input:focus-visible) .calc-toggle-track{outline:2px solid var(--accent);outline-offset:3px}
 .scen-stat{display:flex;flex-direction:column;gap:2px;padding:var(--space-2) var(--space-4);border-right:1px solid var(--border-hair)}
 .scen-stat-row > .scen-stat:last-child{border-right:none;flex:1}
 .scen-stat--wide{grid-column:span 1}
@@ -956,7 +934,7 @@ header p {
 .chart-box{background:var(--surface-sunken);border-radius:var(--radius-lg);padding:var(--space-5);box-shadow:var(--nm-sunken-md);min-width:0;display:flex;flex-direction:column}
 .chart-box h4{font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--text-strong);margin-bottom:4px;letter-spacing:var(--ls-snug)}
 .chart-box p{font-size:var(--text-xs);color:var(--text-faint);margin-bottom:var(--space-4);line-height:var(--lh-relaxed);font-family:var(--font-mono)}
-.chart-box-header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-4)}
+.chart-box-header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-4)}
 .chart-title-group{flex:1;min-width:0}
 .chart-box-title{font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--text-strong);letter-spacing:var(--ls-snug)}
 .chart-copy-btn{
@@ -1049,6 +1027,8 @@ header p {
 }
 
 @media(max-width:640px){
+  .chart-box-header:has(.p-chart-scale-toggle){flex-wrap:wrap}
+  .chart-box-header:has(.p-chart-scale-toggle) .chart-title-group{flex-basis:100%}
   .groups-grid{
     flex-direction:column;
     flex-wrap:nowrap;
@@ -1080,7 +1060,6 @@ header p {
   .scen-stat-row{grid-template-columns:1fr}
   .scen-stat{border-right:none;border-bottom:1px solid var(--border-hair);padding:var(--space-2) var(--space-3)}
   .scen-stat-row > .scen-stat:last-child{border-bottom:none}
-  .p-chart-controls > .scen-stat{border-bottom:none}
 }
 
 /* ── Paste import dialog ── */

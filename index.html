@@ -57,18 +57,13 @@
       </button>
       <button class="theme-btn tour-btn" onclick="startTour()" aria-label="Quick tour" title="Quick tour - how this calculator works">?</button>
       <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
+      <a class="theme-btn new-tab-btn" href="./" target="_blank" rel="noopener" aria-label="Open a fresh calculator in a new tab" title="Open a fresh calculator in a new tab">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="13" height="16" rx="2"/><path d="M9 2h9a2 2 0 0 1 2 2v12"/><path d="M10.5 12h5M13 9.5v5"/></svg>
+      </a>
     </div>
     <div class="share-toast" id="shareToast">Link copied!</div>
   </div>
 </header>
-
-<nav class="jump-nav" id="jumpNav" aria-label="Jump to section">
-  <a href="#groupsGrid">Results</a>
-  <a href="#secProjection">Projection</a>
-  <a href="#powerChartsRow">Power</a>
-  <a href="#deepSection">Deep dive</a>
-  <a href="#deepBreakdowns">Breakdowns</a>
-</nav>
 
 <div class="dashboard">
 
@@ -85,7 +80,7 @@
 
     <div class="gs-header">
       <div class="fg test-name">
-        <label for="testName">Test name</label>
+        <label for="testName">Test name <button type="button" class="help-btn" aria-label="About test names and conversion descriptions" data-concept="testName" onclick="openConcept('testName')">?</button></label>
         <input type="text" id="testName" placeholder="e.g. Checkout unicorn" oninput="updateTestName()">
       </div>
       <div class="fg traffic-total">
@@ -204,7 +199,7 @@
               <input type="number" id="ctrl-n" value="5000" min="1" class="input--key" oninput="onVisitorsChange('ctrl')">
             </div>
             <div class="fg">
-              <label>Conversions</label>
+              <label id="ctrl-conversion-label" for="ctrl-c">Conversions</label>
               <input type="number" id="ctrl-c" value="250" min="0" class="input--key" oninput="recalc()">
             </div>
             <div class="fg">
@@ -227,16 +222,6 @@
     <div class="scen-stat-row proj-hidden" id="projectionMetrics">
       <div class="scen-stat-items" id="scenStatRow"></div>
     </div>
-    <div class="p-chart-controls" id="pChartControls">
-      <div class="scen-stat">
-        <span class="scen-stat-label">Chart scale <button type="button" class="help-btn" aria-label="About chart scales" data-concept="chartScale" onclick="openConcept('chartScale')">?</button></span>
-        <label class="calc-toggle">
-          <input type="checkbox" role="switch" id="pChartScale" aria-label="Use logarithmic chart scale" onchange="onPChartScaleChange()">
-          <span class="calc-toggle-track"><span class="calc-toggle-thumb"></span></span>
-          <span class="calc-toggle-label"><span class="scale-linear">Linear</span><span class="scale-log">Log</span></span>
-        </label>
-      </div>
-    </div>
     <!-- Projection section -->
     <section class="section projection-section" id="secProjection">
       <div class="proj-charts-row">
@@ -245,6 +230,12 @@
             <div class="chart-title-group">
               <div class="chart-box-title" title="One conditional forecast: current conversion rates and traffic continue at the observed pace. The vertical marker is the estimated day the p-value falls below alpha and becomes significant. This is not a stopping rule.">Projected p-value <button type="button" class="help-btn" aria-label="About projected p-values" data-concept="pvalue" onclick="openConcept('pvalue')">?</button></div>
             </div>
+            <label class="calc-toggle p-chart-scale-toggle" aria-label="P-value chart scale">
+              <input type="checkbox" role="switch" id="pChartScale" class="p-chart-scale" aria-label="Use logarithmic chart scale" onchange="onPChartScaleChange(this)">
+              <span class="calc-toggle-track"><span class="calc-toggle-thumb"></span></span>
+              <span class="calc-toggle-label"><span class="scale-linear">Linear</span><span class="scale-log">Logarithmic</span></span>
+            </label>
+            <button type="button" class="help-btn" aria-label="About chart scales" data-concept="chartScale" onclick="openConcept('chartScale')">?</button>
             <button class="chart-copy-btn" onclick="copyChart('cConf')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
             </button>
@@ -256,6 +247,12 @@
             <div class="chart-title-group">
               <div class="scen-chart-title" title="All lines start at the actual current visitor and conversion counts. Only the assumed future variant effect changes; traffic stays at the current pace.">p-value by effect scenario <button type="button" class="help-btn" aria-label="About p-value scenarios" data-concept="pvalue" onclick="openConcept('pvalue')">?</button></div>
             </div>
+            <label class="calc-toggle p-chart-scale-toggle" aria-label="P-value chart scale">
+              <input type="checkbox" role="switch" class="p-chart-scale" aria-label="Use logarithmic chart scale" onchange="onPChartScaleChange(this)">
+              <span class="calc-toggle-track"><span class="calc-toggle-thumb"></span></span>
+              <span class="calc-toggle-label"><span class="scale-linear">Linear</span><span class="scale-log">Logarithmic</span></span>
+            </label>
+            <button type="button" class="help-btn" aria-label="About chart scales" data-concept="chartScale" onclick="openConcept('chartScale')">?</button>
             <button class="chart-copy-btn" onclick="copyChart('cVis')" aria-label="Copy chart image" title="Copy chart">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
             </button>
@@ -329,6 +326,12 @@
           <div class="chart-box">
             <div class="chart-box-header">
               <div class="chart-title-group"><div class="scen-chart-title">p-value over time <button type="button" class="help-btn" aria-label="About p-values over time" data-concept="pvalue" onclick="openConcept('pvalue')">?</button></div></div>
+              <label class="calc-toggle p-chart-scale-toggle" aria-label="P-value chart scale">
+                <input type="checkbox" role="switch" class="p-chart-scale" aria-label="Use logarithmic chart scale" onchange="onPChartScaleChange(this)">
+                <span class="calc-toggle-track"><span class="calc-toggle-thumb"></span></span>
+                <span class="calc-toggle-label"><span class="scale-linear">Linear</span><span class="scale-log">Logarithmic</span></span>
+              </label>
+              <button type="button" class="help-btn" aria-label="About chart scales" data-concept="chartScale" onclick="openConcept('chartScale')">?</button>
               <button class="chart-copy-btn" onclick="copyChart('cDeepConf')" aria-label="Copy chart image" title="Copy chart">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
               </button>

@@ -143,7 +143,6 @@ function renderDeepDive() {
       renderBreakdown();
     }
   }
-  updateJumpNav();
 }
 
 function renderDeepInfo() {

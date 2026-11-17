@@ -217,7 +217,7 @@ function addVariant() {
           <input type="number" id="${id}-n" value="${visitorsEach}" min="1" class="input--key" oninput="onVisitorsChange('${id}')">
         </div>
         <div class="fg">
-          <label>Conversions</label>
+          <label id="${id}-conversion-label" for="${id}-c">Conversions</label>
           <input type="number" id="${id}-c" value="270" min="0" class="input--key" oninput="recalc()">
         </div>
         <div class="fg">
@@ -231,6 +231,7 @@ function addVariant() {
   // Insert before the "add" column
   const addCol = document.querySelector('.group-col--add');
   document.getElementById('groupsGrid').insertBefore(col, addCol);
+  updateConversionLabels();
   nextIdx++;
 
   // Rebalance existing groups' visitor counts
@@ -294,7 +295,7 @@ function pValueHelp() {
 }
 
 function pChartScale() {
-  return document.getElementById('pChartScale').checked ? 'logarithmic' : 'linear';
+  return document.querySelector('.p-chart-scale').checked ? 'logarithmic' : 'linear';
 }
 
 function plotPValue(p) {
@@ -311,16 +312,33 @@ function pValueAxis() {
   };
 }
 
-function onPChartScaleChange() {
+function onPChartScaleChange(source) {
+  document.querySelectorAll('.p-chart-scale').forEach(toggle => {
+    toggle.checked = source.checked;
+  });
   chartsDirty = true;
   renderCharts();
   renderDeepDive();
   if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
+function testNameParts() {
+  const [name = '', ...description] = document.getElementById('testName').value.split('|');
+  return { name: name.trim(), conversion: description.join('|').trim() };
+}
+
+function updateConversionLabels() {
+  const { conversion } = testNameParts();
+  ['ctrl', ...variants.map(variant => variant.id)].forEach(id => {
+    const label = document.getElementById(`${id}-conversion-label`);
+    if (label) label.textContent = conversion ? `Conv.: ${conversion}` : 'Conversions';
+  });
+}
+
 function updateTestName() {
-  const name = document.getElementById('testName').value.trim();
+  const { name } = testNameParts();
   document.title = name ? `${name} - Confidence Calculator` : 'Confidence Calculator - A/B Test Calculator';
+  updateConversionLabels();
   if (!_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
@@ -1070,7 +1088,9 @@ let _restoring = false;
 function restoreFromParams() {
   const p = new URLSearchParams(location.search);
   document.getElementById('testName').value = p.get('name') || '';
-  document.getElementById('pChartScale').checked = p.get('scale') === 'logarithmic';
+  document.querySelectorAll('.p-chart-scale').forEach(toggle => {
+    toggle.checked = p.get('scale') === 'logarithmic';
+  });
   _restoring = true;
   updateTestName();
   _restoring = false;
@@ -1183,7 +1203,6 @@ function toggleProjection(show, skipHistory) {
   document.getElementById('projectionSidebarLabel')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('projectionSidebar')?.classList.toggle('proj-hidden', hidden);
   updateRail();
-  updateJumpNav();
   if (!skipHistory && !_restoring) history.replaceState(null, '', '?' + buildStateParams().toString());
 }
 
@@ -1229,6 +1248,14 @@ function positionCollapseHandle() {
 window.addEventListener('scroll', positionCollapseHandle, { passive: true });
 window.addEventListener('resize', positionCollapseHandle);
 
+function syncStickyHeaderOffset() {
+  const header = document.querySelector('header');
+  document.documentElement.style.setProperty('--sticky-header-h', `${header.offsetHeight}px`);
+}
+
+window.addEventListener('resize', syncStickyHeaderOffset);
+syncStickyHeaderOffset();
+
 function updateRail() {
   const visEl = document.getElementById('railVis');
   if (!visEl) return;
@@ -1257,36 +1284,6 @@ function updateRail() {
     .map(([k, val]) => `<span class="rail-chip"><span class="rail-chip-k">${k}</span><span class="rail-chip-v">${val}</span></span>`)
     .join('');
 }
-
-// ── Sticky jump navigation ──────────────────────────────────────────────────
-
-function jumpTargets() {
-  return [...document.querySelectorAll('#jumpNav a')].map(a => ({ a, el: document.getElementById(a.getAttribute('href').slice(1)) }));
-}
-
-// Only list sections that are currently shown
-function updateJumpNav() {
-  jumpTargets().forEach(({ a, el }) => { a.hidden = !el || !!el.closest('.proj-hidden'); });
-  highlightJumpNav();
-}
-
-function highlightJumpNav() {
-  const navH = document.getElementById('jumpNav').offsetHeight;
-  const shown = jumpTargets().filter(t => !t.a.hidden);
-  const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
-  let current = shown[0];
-  shown.forEach(t => { if (t.el.getBoundingClientRect().top <= navH + 80) current = t; });
-  if (atBottom && shown.length) current = shown[shown.length - 1];
-  shown.forEach(t => t.a.classList.toggle('is-active', t === current));
-}
-
-document.getElementById('jumpNav').addEventListener('click', e => {
-  const a = e.target.closest('a');
-  if (!a) return;
-  e.preventDefault();
-  document.getElementById(a.getAttribute('href').slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
-window.addEventListener('scroll', highlightJumpNav, { passive: true });
 
 // Boot: restore from URL or render defaults
 setCalcMode(document.getElementById('calcToggle').dataset.state, true);

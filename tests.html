@@ -66,6 +66,12 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(forecastP(1000, observedUplift, 1, 1) > 0.99, 'Negative uplift never signals a one-sided increase');
     assert(calculator.projectedPValue(0, 0, 10, 1, 1, 1, 0, 0.1, 2) === null && calculator.projectedPValue(10, 9, 10, 9, 1, 1, 1, 1, 2) === null, 'Invalid samples and impossible binary future rates rejected');
     const doc = calculator.document;
+    const newTab = doc.querySelector('.new-tab-btn');
+    assert(!doc.getElementById('jumpNav') && calculator.getComputedStyle(doc.querySelector('header')).position === 'sticky' &&
+      parseFloat(calculator.getComputedStyle(doc.documentElement).getPropertyValue('--sticky-header-h')) === doc.querySelector('header').offsetHeight,
+      'Sticky header replaces the section subnavigation');
+    assert(newTab.target === '_blank' && new URL(newTab.href).search === '',
+      'New-tab button opens a clean calculator URL');
     for (const id of ['confidence', 'interval', 'pvalue', 'nullhypothesis', 'althypothesis', 'zscore', 'uplift', 'power', 'bonferroni', 'chartScale']) {
       calculator.openConcept(id);
       const firstExplanation = doc.querySelector('#sidebarBody > p').textContent;
@@ -166,10 +172,10 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(!doc.getElementById('secProjection').classList.contains('proj-hidden') &&
       !doc.getElementById('powerChartsRow').classList.contains('proj-hidden'), 'Projection planning reveals the power charts');
     const scaleSwitch = doc.getElementById('pChartScale');
-    assert(scaleSwitch.type === 'checkbox' && scaleSwitch.closest('.calc-toggle') &&
-      scaleSwitch.closest('#pChartControls') && !scaleSwitch.closest('#projectionMetrics') &&
-      doc.getElementById('scenStatRow').closest('#projectionMetrics'),
-      'Chart scale stays separate from projection-only metrics');
+    const scaleSwitches = [...doc.querySelectorAll('.p-chart-scale')];
+    assert(scaleSwitches.length === 3 && scaleSwitches.every(toggle =>
+      toggle.closest('.chart-box-header') && toggle.closest('.p-chart-scale-toggle').nextElementSibling.classList.contains('help-btn')),
+      'Each p-value chart has its own scale switch and help');
     const chart = id => calculator.Chart.getChart(doc.getElementById(id));
     assert(chart('cConf').options.scales.y.type === 'linear' && chart('cVis').options.scales.y.min === 0, 'p-value charts default to an unfloored linear scale');
     assert(doc.getElementById('scenStatRow').querySelectorAll('.scen-stat').length === 4 &&
@@ -177,7 +183,8 @@ document.getElementById('calculator').addEventListener('load', async () => {
       !doc.getElementById('scenStatRow').textContent.includes('Observed uplift'), 'Projection summary omits repeated rate, uplift and scenario legend');
     scaleSwitch.click();
     assert(chart('cConf').options.scales.y.type === 'logarithmic' && chart('cVis').options.scales.y.min === 0.000001 &&
-      calculator.buildStateParams().get('scale') === 'logarithmic', 'Scale switch updates both projection charts and share URL');
+      scaleSwitches.every(toggle => toggle.checked) &&
+      calculator.buildStateParams().get('scale') === 'logarithmic', 'Scale switches stay synchronized and update projection charts and share URL');
     assert(calculator.plotPValue(exampleP) === 0.000001 && !chart('cConf').options.scales.y.ticks.callback(0.000001).includes('e-'), 'Log floor is plotting-only and axis ticks use decimals');
     const data = { dates: ['2026-10-14', '2026-10-15'], groups: [
       { label: 'Control', n: [1000, 1000], c: [100, 100] },
@@ -191,7 +198,8 @@ document.getElementById('calculator').addEventListener('load', async () => {
       close(chart('cDeepConf').data.datasets[0].data[0], calculator.pFromZ(calculator.zTest(1000, 100, 1000, 150).z, 2)), 'Daily-history chart uses the same p-value metric and scale');
     scaleSwitch.click();
     assert(chart('cDeepConf').options.scales.y.type === 'linear' && chart('cConf').options.scales.y.type === 'linear' &&
-      calculator.plotPValue(exampleP) === exampleP, 'Switching back to linear restores unrounded p-values in all charts');
+      scaleSwitches.every(toggle => !toggle.checked) && calculator.plotPValue(exampleP) === exampleP,
+      'Switching back to linear restores unrounded p-values in all charts');
     calculator.setDeepData(null);
     calculator.toggleProjection(false, true);
     assert(!doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Projection metrics remain available with deep dive alone');
@@ -206,10 +214,24 @@ document.getElementById('calculator').addEventListener('load', async () => {
     calculator.updateTestName();
     assert(calculator.document.title === `${testName} - Confidence Calculator` &&
       new URLSearchParams(calculator.location.search).get('name') === testName, 'Test name safely updates document title and URL with special characters');
+    const namedConversion = 'Checkout test | Completed order <paid>';
+    doc.getElementById('testName').value = namedConversion;
+    calculator.updateTestName();
+    assert(calculator.document.title === 'Checkout test - Confidence Calculator' &&
+      doc.getElementById('ctrl-conversion-label').textContent === 'Conv.: Completed order <paid>' &&
+      doc.getElementById('v0-conversion-label').textContent === 'Conv.: Completed order <paid>' &&
+      calculator.buildStateParams().get('name') === namedConversion,
+      'Pipe suffix labels control and variant conversions without changing the test name');
+    calculator.openConcept('testName');
+    assert(doc.getElementById('sidebarBody').textContent.includes('vertical bar') &&
+      doc.getElementById('sidebarBody').textContent.includes('Conv.: Completed orders'),
+      'Test-name help explains conversion descriptions');
+    calculator.closeSidebar();
     doc.getElementById('testName').value = '   ';
     calculator.updateTestName();
     assert(calculator.document.title === 'Confidence Calculator - A/B Test Calculator' &&
-      !calculator.buildStateParams().has('name'), 'Clearing the test name restores default title and removes URL parameter');
+      doc.getElementById('ctrl-conversion-label').textContent === 'Conversions' &&
+      !calculator.buildStateParams().has('name'), 'Clearing the test name restores default labels and removes URL parameter');
     calculator.toggleProjection(false, true);
     assert(!doc.getElementById('secProjection').classList.contains('proj-hidden') &&
       doc.getElementById('powerChartsRow').classList.contains('proj-hidden'), 'Turning planning off keeps p-value charts and hides power charts');
@@ -231,13 +253,16 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(defaultChart('cConf') && defaultChart('cVis'), 'One control and one variant render the p-value charts with planning off');
     assert(defaults.getElementById('bonferroniAlert').style.display === 'none', 'One variant does not show a multiple-comparison adjustment');
     const sharedLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
-    defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1&name=Checkout+%26+Unicorn&scale=logarithmic';
+    defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1&name=Checkout+%26+Unicorn+%7C+Completed+orders&scale=logarithmic';
     await sharedLoaded;
     const shared = defaultsFrame.contentDocument;
     assert(shared.getElementById('calcToggle').dataset.state === 'full' && shared.getElementById('projToggle').checked && shared.getElementById('deepToggle').checked && !shared.getElementById('secProjection').classList.contains('proj-hidden'), 'Explicit shared options override simple starting defaults');
-    assert(shared.getElementById('testName').value === 'Checkout & Unicorn' &&
+    assert(shared.getElementById('testName').value === 'Checkout & Unicorn | Completed orders' &&
       shared.title === 'Checkout & Unicorn - Confidence Calculator' &&
-      shared.getElementById('pChartScale').checked, 'Shared links restore the test name, browser title and chart scale');
+      shared.getElementById('ctrl-conversion-label').textContent === 'Conv.: Completed orders' &&
+      shared.getElementById('v0-conversion-label').textContent === 'Conv.: Completed orders' &&
+      [...shared.querySelectorAll('.p-chart-scale')].every(toggle => toggle.checked),
+      'Shared links restore the test name, conversion description, browser title and chart scale');
     defaultsFrame.remove();
     results.push('All checks passed.');
     document.documentElement.dataset.tests = 'passed';

@@ -146,6 +146,11 @@ const CONCEPTS = {
     tooltip: 'Linear uses equal steps; logarithmic spreads out small p-values. The scale changes the view, not the result.',
     deep: `<p><strong>Linear</strong> uses equal numerical steps. <strong>Logarithmic</strong> spreads out small p-values, making differences near zero easier to see. Lower p-values mean stronger evidence against no effect, not a smaller uplift.</p><p>The switch changes all p-value charts together, but does not change any calculation or significance decision. On the logarithmic scale, values below 0.000001 sit at the chart floor; tooltips still identify them as below that display limit.</p>`,
   },
+  testName: {
+    label: 'Test name and conversion description',
+    tooltip: 'Enter a test name, then optionally add | and a conversion description.',
+    deep: `<p>Enter the test name as usual. To label the conversion metric in the control and variant inputs, add a vertical bar and a description: <code>Checkout test | Completed orders</code>.</p><p>The text before the bar names the test. The text after it appears as <strong>Conv.: Completed orders</strong> on both groups. The full value is retained in shared links.</p>`,
+  },
   splitStability: {
     label: 'Split stability',
     tooltip: 'Checks if every week got roughly the same split as your totals. A split that moves over time can make the totals mislead.',
