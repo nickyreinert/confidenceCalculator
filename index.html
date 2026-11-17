@@ -31,7 +31,7 @@
         <svg class="calc-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 4H6l6 7-6 7h12"/></svg>
         <span class="calc-toggle-label" aria-hidden="true">Calc · <span class="calc-toggle-state" id="calcToggleState">Off</span></span>
       </div>
-      <label class="calc-toggle" aria-label="Show projection charts" title="Show / hide projection charts">
+      <label class="calc-toggle" aria-label="Show projection planning" title="Show / hide projection metrics, planning inputs and power charts; p-value charts remain visible">
         <input type="checkbox" id="projToggle" onchange="toggleProjection(this.checked)">
         <span class="calc-toggle-track">
           <span class="calc-toggle-thumb"></span>
@@ -226,7 +226,9 @@
 
     <div class="scen-stat-row proj-hidden" id="projectionMetrics">
       <div class="scen-stat-items" id="scenStatRow"></div>
-      <div class="scen-stat p-chart-controls" id="pChartControls">
+    </div>
+    <div class="p-chart-controls" id="pChartControls">
+      <div class="scen-stat">
         <span class="scen-stat-label">Chart scale <button type="button" class="help-btn" aria-label="About chart scales" data-concept="chartScale" onclick="openConcept('chartScale')">?</button></span>
         <label class="calc-toggle">
           <input type="checkbox" role="switch" id="pChartScale" aria-label="Use logarithmic chart scale" onchange="onPChartScaleChange()">
@@ -236,7 +238,7 @@
       </div>
     </div>
     <!-- Projection section -->
-    <section class="section projection-section proj-hidden" id="secProjection">
+    <section class="section projection-section" id="secProjection">
       <div class="proj-charts-row">
         <div class="chart-box">
           <div class="chart-box-header">
@@ -264,7 +266,7 @@
       </div>
 
       <!-- Power planning charts -->
-      <div class="proj-charts-row" id="powerChartsRow">
+      <div class="proj-charts-row proj-hidden" id="powerChartsRow">
         <div class="chart-box">
           <div class="chart-box-header">
             <div class="chart-title-group">

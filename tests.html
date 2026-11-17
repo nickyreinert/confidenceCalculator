@@ -163,11 +163,13 @@ document.getElementById('calculator').addEventListener('load', async () => {
     doc.getElementById('v0-n').value = 900;
     calculator.recalc();
     calculator.toggleProjection(true, true);
-    assert(!doc.getElementById('secProjection').classList.contains('proj-hidden'), 'Projection toggle shows the whole section');
+    assert(!doc.getElementById('secProjection').classList.contains('proj-hidden') &&
+      !doc.getElementById('powerChartsRow').classList.contains('proj-hidden'), 'Projection planning reveals the power charts');
     const scaleSwitch = doc.getElementById('pChartScale');
     assert(scaleSwitch.type === 'checkbox' && scaleSwitch.closest('.calc-toggle') &&
-      scaleSwitch.closest('#projectionMetrics') && doc.getElementById('scenStatRow').closest('#projectionMetrics'),
-      'Chart scale uses the common switch inside the metrics strip');
+      scaleSwitch.closest('#pChartControls') && !scaleSwitch.closest('#projectionMetrics') &&
+      doc.getElementById('scenStatRow').closest('#projectionMetrics'),
+      'Chart scale stays separate from projection-only metrics');
     const chart = id => calculator.Chart.getChart(doc.getElementById(id));
     assert(chart('cConf').options.scales.y.type === 'linear' && chart('cVis').options.scales.y.min === 0, 'p-value charts default to an unfloored linear scale');
     assert(doc.getElementById('scenStatRow').querySelectorAll('.scen-stat').length === 4 &&
@@ -192,10 +194,13 @@ document.getElementById('calculator').addEventListener('load', async () => {
       calculator.plotPValue(exampleP) === exampleP, 'Switching back to linear restores unrounded p-values in all charts');
     calculator.setDeepData(null);
     calculator.toggleProjection(false, true);
-    assert(!doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Metrics switch remains available with deep dive alone');
+    assert(!doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Projection metrics remain available with deep dive alone');
     doc.getElementById('deepToggle').checked = false;
     calculator.toggleDeepDive(false, true);
-    assert(doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Metrics strip hides when both chart sections are off');
+    assert(doc.getElementById('projectionMetrics').classList.contains('proj-hidden'), 'Projection metrics hide when planning and deep dive are off');
+    assert(!doc.getElementById('secProjection').classList.contains('proj-hidden') &&
+      doc.getElementById('powerChartsRow').classList.contains('proj-hidden') &&
+      chart('cConf') && chart('cVis'), 'p-value charts stay visible while projection planning and power charts are off');
     const testName = 'Checkout & "Unicorn" <test> 🦄';
     doc.getElementById('testName').value = testName;
     calculator.updateTestName();
@@ -206,7 +211,8 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(calculator.document.title === 'Confidence Calculator - A/B Test Calculator' &&
       !calculator.buildStateParams().has('name'), 'Clearing the test name restores default title and removes URL parameter');
     calculator.toggleProjection(false, true);
-    assert(doc.getElementById('secProjection').classList.contains('proj-hidden'), 'Projection toggle hides the whole section');
+    assert(!doc.getElementById('secProjection').classList.contains('proj-hidden') &&
+      doc.getElementById('powerChartsRow').classList.contains('proj-hidden'), 'Turning planning off keeps p-value charts and hides power charts');
     const defaultsFrame = document.createElement('iframe');
     defaultsFrame.hidden = true;
     const defaultsLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
@@ -215,8 +221,14 @@ document.getElementById('calculator').addEventListener('load', async () => {
     await defaultsLoaded;
     const defaults = defaultsFrame.contentDocument;
     assert(defaults.getElementById('calcToggle').dataset.state === 'off' && defaults.getElementById('groupsGrid').classList.contains('calc-collapsed'), 'Fresh start uses the simplest calculator');
-    assert(!defaults.getElementById('projToggle').checked && !defaults.getElementById('deepToggle').checked && defaults.getElementById('secProjection').classList.contains('proj-hidden') && defaults.getElementById('projectionSidebar').classList.contains('proj-hidden'), 'Fresh start hides projection, planning inputs and deep dive');
+    assert(!defaults.getElementById('projToggle').checked && !defaults.getElementById('deepToggle').checked &&
+      !defaults.getElementById('secProjection').classList.contains('proj-hidden') &&
+      defaults.getElementById('powerChartsRow').classList.contains('proj-hidden') &&
+      defaults.getElementById('projectionSidebar').classList.contains('proj-hidden'),
+      'Fresh start shows p-value charts but hides planning inputs, power charts and deep dive');
     assert(defaults.querySelectorAll('.group-col:not(.group-col--add)').length === 2, 'Fresh start contains only control and one variant');
+    const defaultChart = id => defaultsFrame.contentWindow.Chart.getChart(defaults.getElementById(id));
+    assert(defaultChart('cConf') && defaultChart('cVis'), 'One control and one variant render the p-value charts with planning off');
     assert(defaults.getElementById('bonferroniAlert').style.display === 'none', 'One variant does not show a multiple-comparison adjustment');
     const sharedLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
     defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1&name=Checkout+%26+Unicorn&scale=logarithmic';

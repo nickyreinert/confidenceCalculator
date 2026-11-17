@@ -1178,7 +1178,6 @@ function copyChart(chartId) {
 function toggleProjection(show, skipHistory) {
   const hidden = !show;
   document.getElementById('projectionMetrics').classList.toggle('proj-hidden', !show && !deepEnabled());
-  document.getElementById('secProjection')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerChartsRow')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('powerRadioGroup')?.classList.toggle('proj-hidden', hidden);
   document.getElementById('projectionSidebarLabel')?.classList.toggle('proj-hidden', hidden);
