@@ -238,6 +238,10 @@ header p {
 .calc-toggle:has(input:checked) .calc-toggle-label {
   color:var(--accent-300);
 }
+.metric-mode-toggle{position:relative;margin-top:var(--space-1)}
+.metric-mode-toggle .calc-toggle-label{color:var(--text-strong);min-width:16ch}
+.metric-mode-toggle:has(input:checked) .calc-toggle-label{color:var(--accent-strong)}
+.metric-mode-toggle:has(input:focus-visible) .calc-toggle-track{outline:2px solid var(--accent);outline-offset:3px}
 
 /* Three-state variant (Calc: off / on / full) - each third of the track is a click target */
 .calc-toggle--tri{cursor:default}

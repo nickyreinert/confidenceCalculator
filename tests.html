@@ -87,11 +87,15 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(forecastP(1000, observedUplift, 1, 1) > 0.99, 'Negative uplift never signals a one-sided increase');
     assert(calculator.projectedPValue(0, 0, 10, 1, 1, 1, 0, 0.1, 2) === null && calculator.projectedPValue(10, 9, 10, 9, 1, 1, 1, 1, 2) === null, 'Invalid samples and impossible binary future rates rejected');
     const doc = calculator.document;
-    assert(doc.getElementById('metricMode').value === 'binary', 'Binary is the explicit default metric mode');
+    assert(!doc.getElementById('metricMode').checked &&
+      doc.getElementById('metricMode').type === 'checkbox' &&
+      doc.getElementById('metricMode').closest('.calc-toggle') &&
+      doc.getElementById('metricModeLabel').textContent === 'Binary',
+      'Binary is the default state of the existing metric switch');
     doc.getElementById('v0-c').value = 901;
     calculator.recalc();
     assert(doc.getElementById('result-v0').textContent.includes('Conversions > Visitors') &&
-      doc.getElementById('metricMode').value === 'binary',
+      !doc.getElementById('metricMode').checked,
       'Binary mode rejects conversions above visitors without switching models');
     calculator.setMetricMode('count');
     assert(!doc.getElementById('result-v0').textContent.includes('Check inputs') &&
@@ -126,6 +130,16 @@ document.getElementById('calculator').addEventListener('load', async () => {
         firstExplanation.includes('p-value') && firstExplanation.includes('statistically significant'),
         `${id} help starts with the connection between confidence, alpha, p-value and significance`);
     }
+    calculator.openConcept('metricMode');
+    const metricHelp = doc.getElementById('sidebarBody').textContent;
+    assert(metricHelp.includes('Count per visitor') && !metricHelp.includes('For example, a mean of 2 events'),
+      'Metric help explains the two modes without repeating the dispersion explanation');
+    calculator.openConcept('dispersion');
+    const dispersionHelp = doc.getElementById('sidebarBody').textContent;
+    assert(dispersionHelp.includes('ratio of variance to mean') &&
+      dispersionHelp.includes('mean of 2 events per visitor') &&
+      dispersionHelp.includes('does not estimate dispersion from aggregate totals'),
+      'Poisson dispersion help explains the variance-to-mean assumption with an example');
     calculator.closeSidebar();
     const confidenceHelp = doc.querySelector('[data-concept="confidence"]');
     confidenceHelp.dispatchEvent(new calculator.MouseEvent('mouseover', { bubbles: true }));
@@ -290,7 +304,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
     await defaultsLoaded;
     const defaults = defaultsFrame.contentDocument;
     assert(defaults.getElementById('calcToggle').dataset.state === 'off' && defaults.getElementById('groupsGrid').classList.contains('calc-collapsed') &&
-      defaults.getElementById('metricMode').value === 'binary', 'Fresh start uses the simplest calculator and binary metrics');
+      !defaults.getElementById('metricMode').checked, 'Fresh start uses the simplest calculator and binary metrics');
     assert(!defaults.getElementById('projToggle').checked && !defaults.getElementById('deepToggle').checked &&
       !defaults.getElementById('secProjection').classList.contains('proj-hidden') &&
       defaults.getElementById('powerChartsRow').classList.contains('proj-hidden') &&
@@ -309,7 +323,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
       shared.title === 'Checkout & Unicorn - Confidence Calculator' &&
       shared.getElementById('ctrl-conversion-label').textContent === 'Conv.: Completed orders' &&
       shared.getElementById('v0-conversion-label').textContent === 'Conv.: Completed orders' &&
-      shared.getElementById('metricMode').value === 'count' &&
+      shared.getElementById('metricMode').checked &&
       shared.getElementById('dispersionFactor').value === '2' &&
       shared.getElementById('ctrl-sd').value === '1.5' &&
       shared.getElementById('v0-sd').value === '2.5' &&
@@ -323,7 +337,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
       doc.getElementById('importStatus').textContent.includes('count mode'),
       'Aggregate import warns that per-visitor dispersion is unavailable');
     calculator.applyImport();
-    assert(doc.getElementById('metricMode').value === 'count' &&
+    assert(doc.getElementById('metricMode').checked &&
       doc.getElementById('ctrl-sd').value === '' &&
       doc.getElementById('v0-sd').value === '' &&
       !doc.getElementById('poissonAlert').hidden &&

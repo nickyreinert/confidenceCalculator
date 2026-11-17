@@ -31,8 +31,15 @@ const CONCEPTS = {
     tooltip: 'Choose Binary for at most one conversion per visitor, or Count per visitor for repeatable events.',
     deep: `<p><strong>Binary</strong> is the default and requires conversions ≤ visitors. The calculator reports an input error rather than silently changing the statistical model.</p>
       <p><strong>Count per visitor</strong> compares group means using the per-visitor variances: <code>SE² = s₁²/n₁ + s₂²/n₂</code>. Enter each group's measured standard deviation per visitor. For the relative uplift (a ratio of means), the interval uses the delta-method variance <code>r² · (s₁²/(n₁·mean₁²) + s₂²/(n₂·mean₂²))</code>.</p>
-      <p>If an SD is blank, the calculator uses a Poisson fallback: variance = mean × dispersion factor (default 1). This is only an assumption, and the p-value may be too optimistic; the warning banner stays visible until every group has an SD. Power and projections use the same variance inputs and fallback.</p>
+      <p>When an SD is blank, the Poisson dispersion factor provides an assumed variance for that group. See the separate help beside that field for what the factor means. Power and projections use the same variance inputs.</p>
       <p>Spreadsheet imports switch to count mode because aggregate visitor and event totals do not include per-visitor dispersion. Review the mode and enter measured SDs when available.</p>`
+  },
+  dispersion: {
+    label: 'Poisson dispersion factor',
+    tooltip: 'Sets the assumed variance when a group has no measured SD: variance = mean × factor.',
+    deep: `<p>The dispersion factor is the assumed ratio of variance to mean for each group that has no entered SD. Under the Poisson assumption the factor is <strong>1</strong>, so variance equals the mean.</p>
+      <p>For example, a mean of 2 events per visitor with factor 1 gives variance 2 (SD ≈ 1.41). A factor of 1.5 gives variance 3; it assumes more visitor-to-visitor spread. A factor below 1 assumes less spread.</p>
+      <p>This does not estimate dispersion from aggregate totals. It is a fallback assumption applied only to groups with a blank SD; an entered SD takes precedence. If the true variance is higher than this assumption, uncertainty is understated and the p-value can be too optimistic. Prefer measured visitor-level SDs when available.</p>`
   },
   interval: {
     label: 'Uplift confidence interval',

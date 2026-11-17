@@ -354,7 +354,7 @@ function applyImport() {
   for (let i = 1; i < groups.length; i++) addVariant();
 
   const ids = allGroupIds();
-  document.getElementById('metricMode').value = 'count';
+  document.getElementById('metricMode').checked = true;
   ids.forEach(id => {
     const sd = document.getElementById(id + '-sd');
     if (sd) sd.value = '';

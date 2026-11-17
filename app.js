@@ -29,7 +29,7 @@ function invNorm(p) {
 }
 
 function isCountMode() {
-  return document.getElementById('metricMode')?.value === 'count';
+  return document.getElementById('metricMode')?.checked === true;
 }
 
 function getDispersionFactor() {
@@ -72,6 +72,8 @@ function hasPoissonFallback() {
 function updateMetricModeUI() {
   const count = isCountMode();
   document.querySelectorAll('.count-only').forEach(el => { el.hidden = !count; });
+  const metricLabel = document.getElementById('metricModeLabel');
+  if (metricLabel) metricLabel.textContent = count ? 'Count per visitor' : 'Binary';
   document.querySelectorAll('.metric-mean-label').forEach(label => {
     label.textContent = count ? 'Mean / visitor' : 'Rate';
   });
@@ -81,7 +83,7 @@ function updateMetricModeUI() {
 
 function setMetricMode(mode) {
   const selector = document.getElementById('metricMode');
-  selector.value = mode === 'count' ? 'count' : 'binary';
+  selector.checked = mode === 'count';
   updateMetricModeUI();
   recalc();
 }
@@ -1210,7 +1212,7 @@ function restoreFromParams() {
     toggle.checked = p.get('scale') === 'logarithmic';
   });
   _restoring = true;
-  document.getElementById('metricMode').value = p.get('metric') === 'count' ? 'count' : 'binary';
+  document.getElementById('metricMode').checked = p.get('metric') === 'count';
   if (p.has('disp')) document.getElementById('dispersionFactor').value = p.get('disp');
   updateTestName();
   _restoring = false;
