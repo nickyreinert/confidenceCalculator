@@ -114,7 +114,18 @@
           <label class="radio-pill"><input type="radio" name="sType" value="1" onchange="recalc()"><span>One-tailed (increase)</span></label>
         </div>
       </div>
-      
+      <div class="fg">
+        <label class="radio-label" for="metricMode">Metric <button type="button" class="help-btn" data-concept="metricMode" onclick="openConcept('metricMode')">?</button></label>
+        <select id="metricMode" onchange="setMetricMode(this.value)">
+          <option value="binary" selected>Binary</option>
+          <option value="count">Count per visitor</option>
+        </select>
+      </div>
+      <div class="fg count-only" id="dispersionControl" hidden>
+        <label for="dispersionFactor">Poisson dispersion factor <button type="button" class="help-btn" data-concept="metricMode" onclick="openConcept('metricMode')">?</button></label>
+        <input type="number" id="dispersionFactor" value="1" min="0" step="any" oninput="recalc()">
+        <span class="hint">Fallback variance = mean per visitor × factor.</span>
+      </div>
       <!-- Projection inputs -->
       <div id="projectionSidebarLabel" class="sidebar-section-label proj-hidden">Projection</div>
       <div class="radio-group proj-hidden" id="powerRadioGroup">
@@ -172,6 +183,10 @@
     <div id="bonferroniAlert" class="alert alert-warn" style="display:none">
       You selected <strong id="bfTargetConf">95%</strong> confidence overall. With <strong id="bfCount">2</strong> variants, each interval uses a stricter <strong id="bfAlpha">97.5%</strong> confidence level to limit false alarms across comparisons. Your sidebar selection stays unchanged. <button class="help-btn" data-concept="bonferroni" onclick="openConcept('bonferroni')">?</button>
     </div>
+    <div id="poissonAlert" class="alert alert-warn" hidden role="status">
+      Poisson assumption: a missing SD uses variance = mean × dispersion. The p-value may be too optimistic. Enter each group's measured SD per visitor when available.
+      <button class="help-btn" data-concept="metricMode" onclick="openConcept('metricMode')">?</button>
+    </div>
 
     <!-- Group + result columns grid -->
     <div class="groups-grid calc-hidden calc-collapsed" id="groupsGrid">
@@ -203,8 +218,12 @@
               <input type="number" id="ctrl-c" value="250" min="0" class="input--key" oninput="recalc()">
             </div>
             <div class="fg">
-              <label>Rate</label>
+              <label class="metric-mean-label">Rate</label>
               <div class="rate-display" id="ctrl-rate">5.00%</div>
+            </div>
+            <div class="fg count-only" hidden>
+              <label for="ctrl-sd">SD per visitor</label>
+              <input type="number" id="ctrl-sd" min="0" step="any" placeholder="Poisson fallback" oninput="recalc()">
             </div>
           </div>
         </div>

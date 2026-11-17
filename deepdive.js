@@ -138,6 +138,16 @@ function renderDeepDive() {
     document.getElementById('deepBreakdowns').classList.toggle('proj-hidden', !has);
     renderDeepInfo();
     if (has) {
+      const binaryOverflow = !isCountMode() && allGroupIds().some(id => v(id + '-n') > 0 && v(id + '-c') > v(id + '-n'));
+      const invalid = !metricInputsValid() || binaryOverflow;
+      document.querySelectorAll('#deepBody .proj-charts-row').forEach(row => { row.hidden = invalid; });
+      if (invalid) {
+        document.getElementById('deepChecks').innerHTML = `<div class="alert alert-warn"><strong>Deep dive unavailable.</strong> ${binaryOverflow
+          ? 'Conversions exceed visitors in binary mode; choose count mode.'
+          : 'Enter valid SD or dispersion inputs before analyzing count metrics.'}</div>`;
+        document.getElementById('deepBreakdowns').classList.add('proj-hidden');
+        return;
+      }
       renderDeepChecks();
       renderDeepCharts();
       renderBreakdown();
@@ -207,13 +217,16 @@ function renderDeepChecks() {
     const h = Math.floor(days / 2);
     const part = (g, a, b) => [sum(g.n.slice(a, b)), sum(g.c.slice(a, b))];
     const [n1a, c1a] = part(groups[0], 0, h), [n1b, c1b] = part(groups[0], h, days);
-    groups.slice(1).forEach(g => {
+    groups.slice(1).forEach((g, offset) => {
       const [n2a, c2a] = part(g, 0, h), [n2b, c2b] = part(g, h, days);
       if (!(n1a && n1b && n2a && n2b && c1a && c1b)) return;
       const p1a = c1a / n1a, p2a = c2a / n2a, p1b = c1b / n1b, p2b = c2b / n2b;
-      const count = isCountMetric(p1a, p2a, p1b, p2b);
-      const se = Math.sqrt(rateVariance(p1a, count) / n1a + rateVariance(p2a, count) / n2a +
-                           rateVariance(p1b, count) / n1b + rateVariance(p2b, count) / n2b);
+      const groupId = allGroupIds()[offset + 1];
+      const se = isCountMode()
+        ? Math.sqrt(groupVariance('ctrl', p1a) / n1a + groupVariance(groupId, p2a) / n2a +
+                    groupVariance('ctrl', p1b) / n1b + groupVariance(groupId, p2b) / n2b)
+        : Math.sqrt(rateVariance(p1a) / n1a + rateVariance(p2a) / n2a +
+                    rateVariance(p1b) / n1b + rateVariance(p2b) / n2b);
       const ua = p2a / p1a - 1, ub = p2b / p1b - 1;
       const z = se > 0 ? ((p2b - p1b) - (p2a - p1a)) / se : 0;
       const halves = `${signPct(ua)} in the first half → ${signPct(ub)} in the second half`;
@@ -303,7 +316,10 @@ function renderDeepCharts() {
   const confData = gi => dates.map((_, i) => {
     const n1 = cum[0].n[i], n2 = cum[gi].n[i];
     if (n1 < 1 || n2 < 1) return null;
-    const { z } = zTest(n1, cum[0].c[i], n2, cum[gi].c[i]);
+    const p1 = cum[0].c[i] / n1, p2 = cum[gi].c[i] / n2;
+    const { z } = zTest(n1, cum[0].c[i], n2, cum[gi].c[i],
+      isCountMode() ? groupVariance('ctrl', p1) : undefined,
+      isCountMode() ? groupVariance(allGroupIds()[gi], p2) : undefined);
     return pFromZ(z, tails);
   });
   if (cDeepConf) cDeepConf.destroy();
@@ -350,7 +366,9 @@ function renderDeepCharts() {
       const n1 = cum[0].n[d], c1 = cum[0].c[d], n2 = cum[gi].n[d], c2 = cum[gi].c[d];
       if (n1 < 1 || n2 < 1 || c1 <= 0) { line.push(null); lo.push(null); hi.push(null); return; }
       const p1 = c1 / n1, p2 = c2 / n2;
-      const interval = relativeInterval(n1, c1, n2, c2, 1 - adjConf, tails);
+      const interval = relativeInterval(n1, c1, n2, c2, 1 - adjConf, tails,
+        isCountMode() ? groupVariance('ctrl', p1) : undefined,
+        isCountMode() ? groupVariance(allGroupIds()[gi], p2) : undefined);
       line.push((p2 / p1 - 1) * 100);
       lo.push(interval && Number.isFinite(interval.lower) ? interval.lower * 100 : null);
       hi.push(interval && Number.isFinite(interval.upper) ? interval.upper * 100 : null);
@@ -458,7 +476,9 @@ function renderBreakdown() {
           const p2 = r.n[gi] > 0 ? r.c[gi] / r.n[gi] : 0;
           if (!(r.n[0] > 0 && r.n[gi] > 0 && p1 > 0)) return '<td class="num">-</td><td class="num">-</td><td class="num">-</td>';
           const up = p2 / p1 - 1;
-          const { z } = zTest(r.n[0], r.c[0], r.n[gi], r.c[gi]);
+          const { z } = zTest(r.n[0], r.c[0], r.n[gi], r.c[gi],
+            isCountMode() ? groupVariance('ctrl', r.c[0] / r.n[0]) : undefined,
+            isCountMode() ? groupVariance(allGroupIds()[gi], r.c[gi] / r.n[gi]) : undefined);
           const p = pFromZ(z, tails);
           return `<td class="num">${fmtPct(p2)}</td><td class="num ${up > 0 ? 'pos' : up < 0 ? 'neg' : ''}">${signPct(up)}</td><td class="num bd-muted">${formatPValue(p)}</td>`;
         }).join('');

@@ -32,9 +32,30 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(wider.lower < interval.lower && wider.upper > interval.upper, 'Selected confidence level changes interval width');
     const swapped = calculator.relativeInterval(1000, 112, 1000, 100);
     assert(close(swapped.lower, 1/(1+interval.upper)-1) && close(swapped.upper, 1/(1+interval.lower)-1), 'Group swapping inverts relative-rate interval');
+    calculator.setMetricMode('count');
+    const countTest = calculator.zTest(1000, 1500, 1000, 1800, 4, 9);
+    const countExpectedSe = Math.sqrt(4/1000 + 9/1000);
+    assert(close(countTest.se, countExpectedSe) && close(countTest.z, 0.3/countExpectedSe),
+      'Count-mode mean comparison uses each visitor-level variance divided by its sample size');
+    const countInterval = calculator.relativeInterval(1000, 1500, 1000, 1800, 0.05, 2, 4, 9);
+    const countRatio = 1.8 / 1.5;
+    const countRatioSe = Math.sqrt(9/(1000*1.5**2) + 1.8**2*4/(1000*1.5**4));
+    assert(close(countInterval.uplift, 0.2) &&
+      close(countInterval.lower, countRatio - 1 - 1.95996398454*countRatioSe) &&
+      close(countInterval.upper, countRatio - 1 + 1.95996398454*countRatioSe),
+      'Count-mode relative uplift interval uses the delta-method ratio variance');
+    calculator.document.getElementById('dispersionFactor').value = 2;
+    const poissonTest = calculator.zTest(1000, 1500, 1000, 1800);
+    assert(close(poissonTest.se, Math.sqrt(1.5*2/1000 + 1.8*2/1000)) &&
+      calculator.powerFromN(1000, 1000, 1.5, 1.8, 0.05, 2) > 0 &&
+      close(calculator.projectedPValue(1000, 1500, 1000, 1800, 100, 100, 0, 0.2, 2),
+        calculator.pFromZ(poissonTest.z, 2)),
+      'Count-mode Poisson fallback, power and projections use the same variance model');
+    calculator.setMetricMode('binary');
+    calculator.document.getElementById('dispersionFactor').value = 1;
     let comparisons = 0;
     for (const n1 of [10, 100, 1000]) for (const n2 of [15, 100, 1500])
-    for (const fraction1 of [0.01, 0.1, 0.5, 1, 1.5]) for (const fraction2 of [0, 0.02, 0.12, 0.5, 1, 2])
+    for (const fraction1 of [0.01, 0.1, 0.5, 1]) for (const fraction2 of [0, 0.02, 0.12, 0.5, 1])
     for (const alpha of [0.1, 0.05, 0.01, 0.00001, 0.05/5]) {
       const c1 = Math.max(1, Math.round(n1*fraction1)), c2 = Math.round(n2*fraction2);
       const bounds = calculator.relativeInterval(n1, c1, n2, c2, alpha);
@@ -43,7 +64,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
       if (!(bounds.lower <= bounds.uplift && bounds.upper >= bounds.uplift)) throw new Error('Estimate outside interval');
       comparisons++;
     }
-    assert(comparisons === 1350, '1,350 test/interval checks: unequal allocation, boundaries, Poisson counts and Bonferroni');
+    assert(comparisons === 900, '900 binary test/interval checks: unequal allocation, boundaries and Bonferroni');
     assert(calculator.relativeInterval(0, 0, 100, 10) === null && calculator.relativeInterval(10, -1, 10, 2) === null && calculator.relativeInterval(10, 1.5, 10, 2) === null, 'Invalid counts and zero visitors rejected');
     assert(calculator.relativeInterval(100, 0, 100, 10).uplift === null && calculator.relativeInterval(100, 0, 100, 0).lower === null, 'Zero control conversions explicitly undefined');
     const zero = calculator.relativeInterval(1000, 100, 1000, 0);
@@ -66,6 +87,32 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(forecastP(1000, observedUplift, 1, 1) > 0.99, 'Negative uplift never signals a one-sided increase');
     assert(calculator.projectedPValue(0, 0, 10, 1, 1, 1, 0, 0.1, 2) === null && calculator.projectedPValue(10, 9, 10, 9, 1, 1, 1, 1, 2) === null, 'Invalid samples and impossible binary future rates rejected');
     const doc = calculator.document;
+    assert(doc.getElementById('metricMode').value === 'binary', 'Binary is the explicit default metric mode');
+    doc.getElementById('v0-c').value = 901;
+    calculator.recalc();
+    assert(doc.getElementById('result-v0').textContent.includes('Conversions > Visitors') &&
+      doc.getElementById('metricMode').value === 'binary',
+      'Binary mode rejects conversions above visitors without switching models');
+    calculator.setMetricMode('count');
+    assert(!doc.getElementById('result-v0').textContent.includes('Check inputs') &&
+      !doc.getElementById('poissonAlert').hidden,
+      'Count mode accepts repeat events and warns while using the Poisson fallback');
+    doc.getElementById('ctrl-sd').value = '1.2';
+    doc.getElementById('v0-sd').value = '1.4';
+    doc.getElementById('dispersionFactor').value = '1.8';
+    calculator.recalc();
+    assert(doc.getElementById('poissonAlert').hidden &&
+      calculator.buildStateParams().get('metric') === 'count' &&
+      calculator.buildStateParams().get('disp') === '1.8' &&
+      calculator.buildStateParams().get('csd') === '1.2' &&
+      calculator.buildStateParams().get('vsd0') === '1.4',
+      'Known SD inputs suppress the fallback warning and round-trip in shared URL parameters');
+    calculator.setMetricMode('binary');
+    doc.getElementById('v0-c').value = 100;
+    doc.getElementById('ctrl-sd').value = '';
+    doc.getElementById('v0-sd').value = '';
+    doc.getElementById('dispersionFactor').value = '1';
+    calculator.recalc();
     const newTab = doc.querySelector('.new-tab-btn');
     assert(!doc.getElementById('jumpNav') && calculator.getComputedStyle(doc.querySelector('header')).position === 'sticky' &&
       parseFloat(calculator.getComputedStyle(doc.documentElement).getPropertyValue('--sticky-header-h')) === doc.querySelector('header').offsetHeight,
@@ -242,7 +289,8 @@ document.getElementById('calculator').addEventListener('load', async () => {
     document.body.append(defaultsFrame);
     await defaultsLoaded;
     const defaults = defaultsFrame.contentDocument;
-    assert(defaults.getElementById('calcToggle').dataset.state === 'off' && defaults.getElementById('groupsGrid').classList.contains('calc-collapsed'), 'Fresh start uses the simplest calculator');
+    assert(defaults.getElementById('calcToggle').dataset.state === 'off' && defaults.getElementById('groupsGrid').classList.contains('calc-collapsed') &&
+      defaults.getElementById('metricMode').value === 'binary', 'Fresh start uses the simplest calculator and binary metrics');
     assert(!defaults.getElementById('projToggle').checked && !defaults.getElementById('deepToggle').checked &&
       !defaults.getElementById('secProjection').classList.contains('proj-hidden') &&
       defaults.getElementById('powerChartsRow').classList.contains('proj-hidden') &&
@@ -253,7 +301,7 @@ document.getElementById('calculator').addEventListener('load', async () => {
     assert(defaultChart('cConf') && defaultChart('cVis'), 'One control and one variant render the p-value charts with planning off');
     assert(defaults.getElementById('bonferroniAlert').style.display === 'none', 'One variant does not show a multiple-comparison adjustment');
     const sharedLoaded = new Promise(resolve => defaultsFrame.addEventListener('load', resolve, { once: true }));
-    defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1&name=Checkout+%26+Unicorn+%7C+Completed+orders&scale=logarithmic';
+    defaultsFrame.src = 'index.html?vis=10000&calc=full&proj=1&dd=1&nv=1&name=Checkout+%26+Unicorn+%7C+Completed+orders&scale=logarithmic&metric=count&disp=2&csd=1.5&vsd0=2.5';
     await sharedLoaded;
     const shared = defaultsFrame.contentDocument;
     assert(shared.getElementById('calcToggle').dataset.state === 'full' && shared.getElementById('projToggle').checked && shared.getElementById('deepToggle').checked && !shared.getElementById('secProjection').classList.contains('proj-hidden'), 'Explicit shared options override simple starting defaults');
@@ -261,9 +309,26 @@ document.getElementById('calculator').addEventListener('load', async () => {
       shared.title === 'Checkout & Unicorn - Confidence Calculator' &&
       shared.getElementById('ctrl-conversion-label').textContent === 'Conv.: Completed orders' &&
       shared.getElementById('v0-conversion-label').textContent === 'Conv.: Completed orders' &&
+      shared.getElementById('metricMode').value === 'count' &&
+      shared.getElementById('dispersionFactor').value === '2' &&
+      shared.getElementById('ctrl-sd').value === '1.5' &&
+      shared.getElementById('v0-sd').value === '2.5' &&
       [...shared.querySelectorAll('.p-chart-scale')].every(toggle => toggle.checked),
-      'Shared links restore the test name, conversion description, browser title and chart scale');
+      'Shared links restore the test name, metric, dispersion and SD inputs, conversion description, title and chart scale');
     defaultsFrame.remove();
+    doc.getElementById('ctrl-sd').value = '2';
+    doc.getElementById('v0-sd').value = '3';
+    calculator.openImport('Group,Visitors,Conversions\nControl,100,150\nVariant,100,180');
+    assert(doc.getElementById('importApply').disabled === false &&
+      doc.getElementById('importStatus').textContent.includes('count mode'),
+      'Aggregate import warns that per-visitor dispersion is unavailable');
+    calculator.applyImport();
+    assert(doc.getElementById('metricMode').value === 'count' &&
+      doc.getElementById('ctrl-sd').value === '' &&
+      doc.getElementById('v0-sd').value === '' &&
+      !doc.getElementById('poissonAlert').hidden &&
+      doc.querySelector('#result-v0 .result-invalid') === null,
+      'Applying aggregate import selects count mode, clears stale SDs and uses the warned fallback');
     results.push('All checks passed.');
     document.documentElement.dataset.tests = 'passed';
   } catch (error) {

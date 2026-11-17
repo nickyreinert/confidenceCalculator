@@ -1,6 +1,6 @@
 const SIGNIFICANCE_HELP = {
   tooltip: '95% confidence means accepting a 5% false-alarm risk when no real effect exists: this is alpha (0.05). A p-value below alpha is statistically significant. With more variants, alpha is divided between comparisons.',
-  deep: `<p><strong>How these fit together:</strong> Confidence level is your chosen setting for judging significance. For one variant, 95% confidence means accepting a 5% false-alarm risk when no real effect exists in a preplanned test. This 5% is the <strong>significance level</strong>, called <strong>alpha</strong> (0.05). The <strong>p-value</strong> comes from your data: below alpha means statistically significant; at or above alpha means not significant. With more variants, alpha is divided between comparisons. A matching two-sided confidence interval excludes zero exactly when that test is significant. This is not a probability that the variant wins, and confidence is not 1 minus the p-value.</p>`,
+  deep: `<p><strong>How these fit together:</strong> Confidence level is your chosen setting for judging significance. For one variant, 95% confidence means accepting a 5% false-alarm risk when no real effect exists in a preplanned test. This 5% is the <strong>significance level</strong>, called <strong>alpha</strong> (0.05). The <strong>p-value</strong> comes from your data: below alpha means statistically significant; at or above alpha means not significant. With more variants, alpha is divided between comparisons. For binary metrics, the matching two-sided score interval excludes zero exactly when the test is significant; count-metric intervals use a separate delta-method approximation. This is not a probability that the variant wins, and confidence is not 1 minus the p-value.</p>`,
 };
 
 // Each entry: id, tooltip, deep (full HTML for sidebar body)
@@ -12,7 +12,7 @@ const CONCEPTS = {
       <p>Repeat the experiment and calculate a NEW interval each time. About 95 out of 100 intervals constructed using a 95% confidence method would contain the TRUE effect, which could be positive, negative, or zero.</p>
       <p>Coverage concerns different intervals across experiments with a fixed true effect, not 95% of future results falling inside today's interval. It is not a 95% probability the variant wins or the measured uplift will repeat.</p>
       <p>For matching tests and intervals, a 95% confidence level corresponds to significance level α = 5%. The selected confidence level is not <code>1 − p-value</code>.</p>
-      <p>The relative uplift interval inverts a two-sample score test for the rate ratio. Excluding zero matches the two-sided significance decision. Multiple comparisons use the same Bonferroni-adjusted α in the test and interval. A one-sided increase test uses a matching lower bound instead.</p>
+      <p>For binary metrics, the relative uplift interval inverts a two-sample score test for a rate ratio. Excluding zero matches the two-sided significance decision. Count metrics instead use a delta-method interval from visitor-level variances, so endpoints need not match the mean-difference test decision exactly. Multiple comparisons use the same Bonferroni-adjusted α. A one-sided increase test uses a lower bound.</p>
       <h4>Common thresholds</h4>
       <ul>
         <li><strong>90%</strong> - exploratory tests, low-stakes decisions</li>
@@ -24,17 +24,25 @@ const CONCEPTS = {
   inputs: {
     label: 'Input requirements',
     tooltip: 'Use whole, non-negative counts and at least one visitor per group.',
-    deep: `<p>Use whole, non-negative counts and at least one visitor in each group. Complete all visitor and conversion fields before calculating a result.</p><p>Conversions may exceed visitors for count metrics; these use a Poisson event-rate model.</p>`
+    deep: `<p>Use whole, non-negative counts and at least one visitor in each group. Complete all visitor and conversion fields before calculating a result. In binary mode, conversions cannot exceed visitors; switch to count mode for repeated events per visitor.</p>`
+  },
+  metricMode: {
+    label: 'Binary and count metrics',
+    tooltip: 'Choose Binary for at most one conversion per visitor, or Count per visitor for repeatable events.',
+    deep: `<p><strong>Binary</strong> is the default and requires conversions ≤ visitors. The calculator reports an input error rather than silently changing the statistical model.</p>
+      <p><strong>Count per visitor</strong> compares group means using the per-visitor variances: <code>SE² = s₁²/n₁ + s₂²/n₂</code>. Enter each group's measured standard deviation per visitor. For the relative uplift (a ratio of means), the interval uses the delta-method variance <code>r² · (s₁²/(n₁·mean₁²) + s₂²/(n₂·mean₂²))</code>.</p>
+      <p>If an SD is blank, the calculator uses a Poisson fallback: variance = mean × dispersion factor (default 1). This is only an assumption, and the p-value may be too optimistic; the warning banner stays visible until every group has an SD. Power and projections use the same variance inputs and fallback.</p>
+      <p>Spreadsheet imports switch to count mode because aggregate visitor and event totals do not include per-visitor dispersion. Review the mode and enter measured SDs when available.</p>`
   },
   interval: {
     label: 'Uplift confidence interval',
     tooltip: 'Uncertainty around relative uplift. Zero means no change; an interval crossing zero is not significant.',
     deep: `
       <p>The point estimate is the observed relative uplift. The interval describes its uncertainty, not a guaranteed range for future results.</p>
-      <p>A two-sided interval excluding zero matches a significant result. A one-sided increase test shows a lower bound with no upper limit. Not significant does not mean no effect.</p>
+      <p>For binary metrics, a two-sided interval excluding zero matches a significant result. Count-metric intervals use the delta method and can differ slightly from the mean-difference test. A one-sided increase test shows a lower bound with no upper limit. Not significant does not mean no effect.</p>
       <p>Across repeated experiments, a 95% method produces intervals containing the true effect about 95% of the time. This is not a 95% probability the variant wins.</p>
       <p>With multiple variants, the displayed level is Bonferroni-adjusted per comparison; the selected level applies to the family. Zero control conversions make relative uplift and its interval undefined; the absolute difference and test remain available.</p>
-      <p>The score approximation assumes independent binary outcomes, or independent Poisson event rates for count metrics. Sparse samples, boundary rates and correlated observations need caution.</p>
+      <p>Binary intervals use a two-sample score approximation. Count-per-visitor intervals use a delta-method approximation from the entered per-visitor variances; the Poisson fallback assumes variance = mean × dispersion. Sparse samples, zero means and correlated observations need caution.</p>
     `
   },
   pvalue: {
@@ -50,7 +58,7 @@ const CONCEPTS = {
         <li><strong>p-value:</strong> the result calculated from visitors, conversions and test direction. Changing target power or confidence level does not change it.</li>
         <li><strong>Significance level (alpha):</strong> the cutoff for calling a result statistically significant. A 95% confidence level sets this to 0.05; multiple variants divide that cutoff between comparisons.</li>
         <li><strong>Confidence level:</strong> the chosen long-run coverage of the interval, not a measured probability of winning.</li>
-        <li><strong>Confidence interval:</strong> the uncertainty range around uplift. For a matching two-sided test it excludes zero exactly when the p-value is below the threshold.</li>
+        <li><strong>Confidence interval:</strong> the uncertainty range around uplift. For binary metrics, a matching two-sided score interval excludes zero exactly when the p-value is below the threshold; count metrics use a delta-method approximation.</li>
       </ul>
       <p><strong>Very small values:</strong> we show <code>p-value &lt; 0.000001</code> rather than rounding to zero or using scientific notation. Several different inputs can all fall below this display limit. The calculation still uses the unrounded value.</p>
       <p><strong>Chart scales:</strong> linear uses equal numerical steps. Logarithmic spreads out small p-values; values below 0.000001 sit at the chart floor, but tooltips still report them as below the display limit. Both scales show the same test result. Lower is stronger evidence, not a smaller uplift.</p>
@@ -87,7 +95,7 @@ const CONCEPTS = {
     tooltip: 'The z-score measures signal relative to noise and is converted to the p-value. For one variant in a two-sided test, an absolute z-score above about 1.96 gives a p-value below 0.05.',
     deep: `
       <p>The z-score measures how many standard errors the observed difference sits away from zero.</p>
-      <p>Formula: <code>z = (p₂ − p₁) / SE</code>, where SE is the pooled standard error.</p>
+      <p>Formula: <code>z = (p₂ − p₁) / SE</code>, where binary metrics use the pooled standard error and count metrics use each group's visitor-level variance.</p>
       <p>The further z is from zero, the less likely the result is due to chance:</p>
       <ul>
         <li><strong>|z| ≥ 1.645</strong> → 90% confidence (two-tailed)</li>
@@ -118,6 +126,7 @@ const CONCEPTS = {
       <p>IF a real effect of the SPECIFIED SIZE exists, 80 out of 100 comparable experiments would detect it as statistically significant at 80% power.</p>
       <p>Choose a separate, relevant effect size for planning. Power calculated from today's observed uplift is not independent evidence that the result is correct. The calculator never automatically copies observed uplift into this assumption.</p>
       <p>Power concerns false negatives conditional on an assumed effect. Significance level α concerns false positives when the true effect is zero. Neither is the probability that today's decision is right.</p>
+      <p>In count mode, power uses the same per-visitor SD inputs or Poisson fallback as the result calculation.</p>
       <p><code>Power = 1 − β</code>, where β is the Type-II error rate. At <strong>80% power</strong>, you still miss the assumed real effect 20% of the time.</p>
       <p>Power is not part of the p-value calculation for the observed result. It helps you estimate before the test starts how many visitors are needed to reliably detect an effect.</p>
       <p>Sufficient power does not establish sufficient calendar duration. Plan business cycles and a stopping rule in advance; do not repeatedly check and stop when significance appears.</p>

@@ -317,13 +317,15 @@ function renderImportPreview() {
   const msgs = [];
   if (groups.length > IMPORT_MAX_GROUPS) msgs.push(`Only the first ${IMPORT_MAX_GROUPS - 1} variants are imported (max. 5).`);
   if (sameCol) msgs.push('Visitors and conversions use the same column.');
+  msgs.push('Aggregate imports use count mode; per-visitor SD is unavailable, so the Poisson fallback applies unless you enter SDs.');
   status.className = 'import-status' + (sameCol ? ' import-status--err' : msgs.length ? ' import-status--warn' : ' import-status--ok');
   const daily = importModel.daily;
   const dailyTxt = daily
     ? ` Daily data: ${daily.spanDays} days (${fmtShortDate(daily.from)} - ${fmtShortDate(daily.to)}) - opens the Deep dive.`
       + (importModel.rows.some(r => r.fromTotal) ? ' Card totals come from the total rows.' : '')
     : '';
-  status.textContent = (msgs.length ? msgs.join(' ') : `${used.length} groups detected - check the mapping, then apply.`) + dailyTxt;
+  const summary = `${used.length} groups detected - check the mapping, then apply.`;
+  status.textContent = `${summary} ${msgs.join(' ')}${dailyTxt}`;
 
   const fmtInt = n => n.toLocaleString();
   preview.innerHTML = `
@@ -352,6 +354,11 @@ function applyImport() {
   for (let i = 1; i < groups.length; i++) addVariant();
 
   const ids = allGroupIds();
+  document.getElementById('metricMode').value = 'count';
+  ids.forEach(id => {
+    const sd = document.getElementById(id + '-sd');
+    if (sd) sd.value = '';
+  });
   const total = groups.reduce((s, g) => s + g.n, 0);
   groups.forEach((g, i) => {
     document.getElementById(ids[i] + '-n').value = g.n;
@@ -359,6 +366,7 @@ function applyImport() {
     setKnobDisplay(ids[i], total > 0 ? Math.round(g.n / total * 100) : Math.round(100 / ids.length));
   });
   document.getElementById('sTotalVis').value = total;
+  updateMetricModeUI();
 
   // Let the projection pick up the observed uplift from the new data
   delete document.getElementById('scUplift').dataset.manual;

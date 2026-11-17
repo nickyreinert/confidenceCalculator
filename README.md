@@ -15,6 +15,7 @@ Tab and Shift+Tab select the full contents of editable fields, ready to replace.
 ## What it does
 
 - Compares visitors and conversions for your control and test versions
+- Explicitly selects **Binary** (default) or **Count per visitor** metrics
 - Shows conversion rates, observed relative uplift, its confidence interval, p-value and significance decision together
 - Separates the assumed relevant effect for power from the observed uplift
 - Estimates how many visitors you may need and charts your projections
@@ -50,9 +51,9 @@ Try it with the fictional [daily sample data](demo-daily.csv) - a test that look
 
 ## Statistical method
 
-Relative uplift is `variant rate / control rate - 1`; absolute difference is reported separately in percentage points. The point estimate is not a guaranteed or repeatable outcome.
+Relative uplift is `variant mean / control mean - 1`; absolute difference is reported separately in percentage points. The point estimate is not a guaranteed or repeatable outcome.
 
-The relative confidence interval inverts the two-sample score test for a rate ratio `r`. For binary outcomes, fit the nuisance control probability under `p_variant = r * p_control` by constrained maximum likelihood:
+For binary outcomes, the relative confidence interval inverts the two-sample score test for a rate ratio `r`. Fit the nuisance control probability under `p_variant = r * p_control` by constrained maximum likelihood:
 
 ```text
 B = n_control + c_variant + r * (n_variant + c_control)
@@ -68,11 +69,20 @@ The multiple-variant notice shows the selected confidence exactly as labelled in
 
 One-tailed tests are explicitly for an **increase**, selected in advance: `p = 1 - Phi(z)`, with a matching one-sided lower bound and unbounded upper endpoint. A negative observed effect is not declared a one-sided win or loss.
 
-The existing support for conversions exceeding visitors is retained as a **Poisson event-rate** model, not a binary conversion probability. Its constrained estimate is `p = total_events / (n_control + r*n_variant)` and its variance replaces `p*(1-p)` by `p`. Both models assume independent groups and observations. These are asymptotic normal score methods, not exact coverage guarantees; sparse samples, boundary rates, clustering and overdispersed event counts require particular caution.
+**Binary** is the default and requires conversions not to exceed visitors. Such input produces an explicit error; the calculator never silently changes models.
 
-Zero visitors, negative counts, fractional counts and empty inputs cannot produce a result. With zero control conversions, relative uplift and its interval are explicitly undefined; the absolute difference and test remain available. With zero variant conversions and a positive baseline, uplift is -100% and the score interval has a finite upper bound, not a collapsed zero-width interval. No pseudocounts are added.
+For **Count per visitor** metrics, the observed mean is `conversions / visitors`. Enter each group's standard deviation across visitors; the variance of a group mean is `s² / n`, and the mean-comparison standard error is `sqrt(s_control²/n_control + s_variant²/n_variant)`. The relative-uplift interval uses the delta-method variance for the ratio `r = mean_variant / mean_control`:
 
-Power is an approximate normal-model planning calculation using the **separately chosen** relevant effect and the control rate as the baseline estimate. It integrates the alternative distribution beyond the matching pooled-test cutoff, including both rejection tails for a two-sided test. Bonferroni is applied to power planning too. The target power is distinct from calculated power at current sample sizes. The assumed effect defaults to +10% and is never automatically replaced with observed uplift; existing shared `scupl` values still restore unchanged.
+```text
+Var(r) ≈ r² · (s_control²/(n_control·mean_control²) +
+               s_variant²/(n_variant·mean_variant²))
+```
+
+The interval is `r ± z*sqrt(Var(r))`, converted to uplift by subtracting one. If an SD is missing, a clearly displayed **Poisson fallback** uses `variance = mean × dispersion factor` (default 1); its p-value may be too optimistic. The factor is a user-configurable fallback assumption, not a standard estimator. Power and projections use the same per-group SDs or fallback, and are unavailable when those variance inputs are invalid. Aggregate spreadsheet imports select count mode and clear old SD inputs because visitor and event totals do not provide per-visitor dispersion. Both modes assume independent visitors and groups; sparse samples, zero means and correlated observations require caution.
+
+Zero visitors, negative counts, fractional counts and empty inputs cannot produce a result. With zero control conversions, relative uplift and its interval are explicitly undefined; the absolute difference and test remain available. In binary mode, zero variant conversions and a positive baseline give -100% uplift and a score interval with a finite upper bound, not a collapsed zero-width interval. A count-mode delta interval can be unavailable at a zero variant mean when no positive SD is supplied. No pseudocounts are added.
+
+Power is an approximate normal-model planning calculation using the **separately chosen** relevant effect and the control mean as the baseline estimate. Binary power integrates the alternative distribution beyond the pooled-test cutoff; count power uses the same per-group variance inputs and an unpooled mean-difference cutoff. Both include the appropriate rejection tails and apply Bonferroni to power planning. The target power is distinct from calculated power at current sample sizes. The assumed effect defaults to +10% and is never automatically replaced with observed uplift; existing shared `scupl` values still restore unchanged.
 
 Projection and daily-history charts consistently plot **p-value**, with a synchronized **Linear / Logarithmic** switch beside each p-value chart's copy button (linear by default). Lower means stronger evidence against no effect. Logarithmic charts floor values below 0.000001 for plotting only; tooltips retain the below-limit label. Projections are conditional scenarios, not probabilities of winning or a license to stop at a crossing. Adequate power does not establish sufficient calendar duration; plan business cycles and a stopping rule in advance.
 
@@ -82,6 +92,6 @@ Very small p-values display as **< 0.000001**, never a rounded zero or scientifi
 
 Open [tests.html](tests.html) through the same static host as the calculator, or serve this directory with `python3 -m http.server 8000` and visit `http://localhost:8000/tests.html`. No build step or test dependencies are needed; the application still loads Chart.js from its existing CDN. The test page reports PASS/FAIL and sets `document.documentElement.dataset.tests` to `passed` or `failed`.
 
-Coverage includes numerical interval regressions, confidence-level changes, swapped groups, 1,350 test/interval consistency checks (unequal samples, boundary rates, count metrics and Bonferroni), invalid/zero counts, one-sided direction, power behavior, independent planning assumptions, visible results in compact mode, connection-first statistical help, Tab selection without changing pointer behavior, fresh-start defaults, tiny-p-value precision and display, the integrated linear/log switch across charts, compact projection summaries and named shared-link round trips. For responsive inspection, resize the test iframe or open the calculator at a mobile viewport.
+Coverage includes numerical binary interval regressions, count-mode variance and delta-method cases, URL round trips for metric/dispersion/SD inputs, binary overflow validation, confidence-level changes, unequal samples, Bonferroni, invalid/zero counts, one-sided direction, power and projection behavior, independent planning assumptions, visible results in compact mode, connection-first statistical help, Tab selection without changing pointer behavior, fresh-start defaults, tiny-p-value precision and display, the integrated linear/log switch across charts, compact projection summaries and named shared-link round trips. For responsive inspection, resize the test iframe or open the calculator at a mobile viewport.
 
 **Note:** A 95% confidence method covers the fixed true effect in about 95% of newly calculated intervals over repeated experiments. It is not a 95% probability the variant wins or that today's uplift will repeat. Not significant does not establish no effect.
