@@ -29,25 +29,25 @@ function invNorm(p) {
 }
 
 function isCountMode() {
-  return document.getElementById('metricMode')?.checked === true;
+  return document.querySelector('input[name="sMetric"]:checked')?.value === 'count';
 }
 
-function getDispersionFactor() {
-  const raw = document.getElementById('dispersionFactor')?.value ?? '1';
+function getSharedSd() {
+  const raw = document.getElementById('sdPerVisitor')?.value ?? '';
+  if (raw.trim() === '') return NaN;
   const value = Number(raw);
-  return raw.trim() !== '' && Number.isFinite(value) && value >= 0 ? value : NaN;
+  return Number.isFinite(value) && value >= 0 ? value : NaN;
 }
 
-function groupVariance(id, mean) {
-  const known = explicitGroupVariance(id);
-  return known === null ? mean * getDispersionFactor() : known;
+function sharedSdStatus() {
+  const raw = document.getElementById('sdPerVisitor')?.value ?? '';
+  if (raw.trim() === '') return 'missing';
+  return Number.isFinite(getSharedSd()) ? 'valid' : 'invalid';
 }
 
-function explicitGroupVariance(id) {
-  const raw = document.getElementById(`${id}-sd`)?.value ?? '';
-  if (raw.trim() === '') return null;
-  const sd = Number(raw);
-  return Number.isFinite(sd) && sd >= 0 ? sd * sd : NaN;
+function groupVariance() {
+  const sd = getSharedSd();
+  return sd * sd;
 }
 
 function rateVariance(p) {
@@ -55,48 +55,37 @@ function rateVariance(p) {
 }
 
 function metricInputsValid() {
-  if (!isCountMode()) return true;
-  if (hasPoissonFallback() && !Number.isFinite(getDispersionFactor())) return false;
-  return allGroupIds().every(id => {
-    const raw = document.getElementById(`${id}-sd`)?.value ?? '';
-    if (raw.trim() === '') return true;
-    const sd = Number(raw);
-    return Number.isFinite(sd) && sd >= 0;
-  });
+  return !isCountMode() || sharedSdStatus() === 'valid';
 }
 
-function hasPoissonFallback() {
-  return isCountMode() && allGroupIds().some(id => !document.getElementById(`${id}-sd`)?.value.trim());
-}
+let legacyDispIgnored = false;
 
 function updateMetricModeUI() {
   const count = isCountMode();
   document.querySelectorAll('.count-only').forEach(el => { el.hidden = !count; });
-  const metricLabel = document.getElementById('metricModeLabel');
-  if (metricLabel) metricLabel.textContent = count ? 'Count per visitor' : 'Binary';
   document.querySelectorAll('.metric-mean-label').forEach(label => {
     label.textContent = count ? 'Mean / visitor' : 'Rate';
   });
-  const alert = document.getElementById('poissonAlert');
-  if (alert) alert.hidden = !hasPoissonFallback();
+  const sdAlert = document.getElementById('sdRequiredAlert');
+  if (sdAlert) sdAlert.hidden = !count || sharedSdStatus() === 'valid';
+  const legacyAlert = document.getElementById('legacyDispAlert');
+  if (legacyAlert) legacyAlert.hidden = !legacyDispIgnored;
 }
 
 function setMetricMode(mode) {
-  const selector = document.getElementById('metricMode');
-  selector.checked = mode === 'count';
+  document.querySelector(`input[name="sMetric"][value="${mode === 'count' ? 'count' : 'binary'}"]`).checked = true;
   updateMetricModeUI();
   recalc();
 }
 
-function zTest(n1, c1, n2, c2, variance1, variance2) {
+function zTest(n1, c1, n2, c2) {
   if (!(n1 > 0) || !(n2 > 0) || c1 < 0 || c2 < 0) return { z: NaN, p1: NaN, p2: NaN, pp: NaN, se: NaN, count: isCountMode() };
   const p1 = c1/n1, p2 = c2/n2;
   const pp = (c1+c2)/(n1+n2);
   const count = isCountMode();
   if (count) {
-    const v1 = variance1 == null ? p1 * getDispersionFactor() : variance1;
-    const v2 = variance2 == null ? p2 * getDispersionFactor() : variance2;
-    const se = Math.sqrt(v1 / n1 + v2 / n2);
+    const sharedVariance = groupVariance();
+    const se = Math.sqrt(sharedVariance / n1 + sharedVariance / n2);
     if (!Number.isFinite(se)) return { z: NaN, p1, p2, pp, se, count };
     if (!(se > 0)) return { z: p1 === p2 ? 0 : NaN, p1, p2, pp, se, count };
     return { z: (p2 - p1) / se, p1, p2, pp, se, count };
@@ -284,10 +273,6 @@ function addVariant() {
           <label class="metric-mean-label">Rate</label>
           <div class="rate-display" id="${id}-rate" style="color:${color}">-</div>
         </div>
-        <div class="fg count-only" hidden>
-          <label for="${id}-sd">SD per visitor</label>
-          <input type="number" id="${id}-sd" min="0" step="any" placeholder="Poisson fallback" oninput="recalc()">
-        </div>
       </div>
     </div>
     <div class="result-card-slot" id="result-${id}"></div>`;
@@ -474,7 +459,9 @@ function recalc() {
     }
 
     const invalidGroup = !metricInputsValid()
-      ? 'Enter a non-negative SD per visitor or a valid dispersion factor.'
+      ? sharedSdStatus() === 'missing'
+        ? 'SD per visitor required. Enter it or calculate it from a visitor table.'
+        : 'Enter a valid, non-negative SD per visitor.'
       : !isCountMode() && (c1 > n1 || c2 > n2)
         ? 'Conversions > Visitors: no unique-visitor count; please choose count mode.'
         : '';
@@ -483,17 +470,16 @@ function recalc() {
       return;
     }
 
-    const variance1 = isCountMode() ? groupVariance('ctrl', p1) : undefined;
-    const variance2 = isCountMode() ? groupVariance(vr.id, p2) : undefined;
-    const { z, pp, se, count } = zTest(n1, c1, n2, c2, variance1, variance2);
+    const { z, pp, se, count } = zTest(n1, c1, n2, c2);
     if (!Number.isFinite(z) || !Number.isFinite(se)) {
       slot.innerHTML = `<div class="result-card result-invalid" role="alert"><span>Cannot estimate the test from these variance inputs.</span></div>`;
       return;
     }
+    const sharedVariance = count ? groupVariance() : NaN;
     const pVal    = pFromZ(z, tails);
     const uplift  = p1 > 0 ? (p2-p1)/p1 : NaN;
     const absDiff = p2 - p1;
-    const interval = relativeInterval(n1, c1, n2, c2, adjAlpha, tails, variance1, variance2);
+    const interval = relativeInterval(n1, c1, n2, c2, adjAlpha, tails);
     const significant = pVal < adjAlpha;
     const isWin  = significant && absDiff > 0;
     const isLoss = significant && absDiff < 0;
@@ -539,11 +525,11 @@ function recalc() {
         <div class="cc-divider"></div>
 
         <div class="cc-step cc-mid">
-          <span class="cc-key">${count ? 'Variance per visitor (control / variant)' : 'Pooled p̄ = (c₁+c₂)/(n₁+n₂)'}</span>
-          <span class="cc-val">${count ? `${fmt(variance1, 4)} / ${fmt(variance2, 4)}` : fmtPct(pp)}</span>
+          <span class="cc-key">${count ? 'Shared variance per visitor' : 'Pooled p̄ = (c₁+c₂)/(n₁+n₂)'}</span>
+          <span class="cc-val">${count ? fmt(sharedVariance, 4) : fmtPct(pp)}</span>
         </div>
         <div class="cc-step cc-mid">
-          <span class="cc-key">${count ? 'SE = √(s₁²/n₁ + s₂²/n₂) <small>(per-visitor variances)</small>' : 'SE = √(p̄·(1−p̄)·(1/n₁+1/n₂))'}</span>
+          <span class="cc-key">${count ? 'SE = √(s²/n₁ + s²/n₂) <small>(shared SD²)</small>' : 'SE = √(p̄·(1−p̄)·(1/n₁+1/n₂))'}</span>
           <span class="cc-val">${fmt(se,6)}</span>
         </div>
 
@@ -593,14 +579,14 @@ function recalc() {
 let cConf = null, cVis = null, cPowerVis = null, cPowerTime = null;
 
 // Confidence (in %) for n1 / n2 visitors in control / variant, if the true rates are p1 / p2
-function confFromN(n1, n2, p1, p2, tails, variance1, variance2) {
+function confFromN(n1, n2, p1, p2, tails) {
   const count = isCountMode();
+  if (count && !metricInputsValid()) return null;
   if (p1 <= 0 || p2 < 0 || (!count && (p1 > 1 || p2 > 1)) || !(n1 > 0) || !(n2 > 0)) return 0;
   if (count) {
-    const v1 = variance1 == null ? p1 * getDispersionFactor() : variance1;
-    const v2 = variance2 == null ? p2 * getDispersionFactor() : variance2;
-    const se = Math.sqrt(v1 / n1 + v2 / n2);
-    if (!(se > 0)) return 0;
+    const sharedVariance = groupVariance();
+    const se = Math.sqrt(sharedVariance / n1 + sharedVariance / n2);
+    if (!(se > 0) || !Number.isFinite(se)) return null;
     return Math.max(0, Math.min(100, (1 - pFromZ((p2 - p1) / se, tails)) * 100));
   }
   const pp = (p1 * n1 + p2 * n2) / (n1 + n2);
@@ -611,18 +597,17 @@ function confFromN(n1, n2, p1, p2, tails, variance1, variance2) {
 }
 
 // Chance (in %) that a test with n1 / n2 visitors detects the assumed effect
-function powerFromN(n1, n2, p1, p2, alpha, tails, variance1, variance2) {
+function powerFromN(n1, n2, p1, p2, alpha, tails) {
   const count = isCountMode();
   if (p1 <= 0 || p2 < 0 || (!count && (p1 > 1 || p2 > 1)) || !(n1 > 0) || !(n2 > 0)) return null;
-  const v1 = count ? (variance1 == null ? p1 * getDispersionFactor() : variance1) : rateVariance(p1);
-  const v2 = count ? (variance2 == null ? p2 * getDispersionFactor() : variance2) : rateVariance(p2);
+  const sharedVariance = count ? groupVariance() : NaN;
+  const v1 = count ? sharedVariance : rateVariance(p1);
+  const v2 = count ? sharedVariance : rateVariance(p2);
   const se = Math.sqrt(v1 / n1 + v2 / n2);
-  if (!(se > 0)) return null;
+  if (!(se > 0) || !Number.isFinite(se)) return null;
   const pooled = (p1*n1 + p2*n2)/(n1+n2);
-  const nullV1 = count && variance1 == null ? pooled * getDispersionFactor() : v1;
-  const nullV2 = count && variance2 == null ? pooled * getDispersionFactor() : v2;
   const cutoff = invNorm(1 - alpha / tails) * Math.sqrt(
-    count ? nullV1 / n1 + nullV2 / n2 : rateVariance(pooled)*(1/n1+1/n2));
+    count ? sharedVariance / n1 + sharedVariance / n2 : rateVariance(pooled)*(1/n1+1/n2));
   const difference = p2 - p1;
   return 100 * (1 - normalCDF((cutoff - difference)/se) + (tails === 2 ? normalCDF((-cutoff - difference)/se) : 0));
 }
@@ -645,13 +630,13 @@ function unitGrid(end) {
   return out;
 }
 
-function projectedPValue(n1, c1, n2, c2, daily1, daily2, extraDays, uplift, tails, variance1, variance2) {
+function projectedPValue(n1, c1, n2, c2, daily1, daily2, extraDays, uplift, tails) {
   if (!(n1 > 0) || !(n2 > 0) || c1 < 0 || c2 < 0 || extraDays < 0) return null;
   const controlRate = c1 / n1;
   const variantRate = controlRate * (1 + uplift);
   if (variantRate < 0 || (!isCountMode() && variantRate > 1)) return null;
   const result = zTest(n1 + daily1 * extraDays, c1 + daily1 * extraDays * controlRate,
-    n2 + daily2 * extraDays, c2 + daily2 * extraDays * variantRate, variance1, variance2);
+    n2 + daily2 * extraDays, c2 + daily2 * extraDays * variantRate);
   return Number.isFinite(result.z) ? pFromZ(result.z, tails) : null;
 }
 
@@ -677,21 +662,19 @@ function renderCharts() {
   if (!metricInputsValid() || invalidBinary) {
     document.getElementById('currentPower').textContent = invalidBinary
       ? 'Power and projections unavailable: conversions exceed visitors in binary mode.'
-      : 'Power and projections unavailable: enter valid dispersion inputs.';
+      : sharedSdStatus() === 'missing'
+        ? 'Power and projections unavailable: enter an SD per visitor or calculate it from the visitor table.'
+        : 'Power and projections unavailable: enter a valid SD per visitor.';
     document.getElementById('scenStatRow').innerHTML = '';
     [cConf, cVis, cPowerVis, cPowerTime].forEach(chart => chart?.destroy());
     cConf = cVis = cPowerVis = cPowerTime = null;
     return;
   }
-  const ctrlKnownVariance = isCountMode() ? explicitGroupVariance('ctrl') : undefined;
-
   // Projections start from the visitors collected so far and continue at the traffic basis:
   // recent daily traffic (deep dive data) or the average since the start.
   const forecastVariant = variants.reduce((selected, candidate) => {
-    const candidateP = pFromZ(zTest(ctrlN, ctrlC, v(candidate.id + '-n'), v(candidate.id + '-c'),
-      ctrlKnownVariance, isCountMode() ? explicitGroupVariance(candidate.id) : undefined).z, tails);
-    const selectedP = selected ? pFromZ(zTest(ctrlN, ctrlC, v(selected.id + '-n'), v(selected.id + '-c'),
-      ctrlKnownVariance, isCountMode() ? explicitGroupVariance(selected.id) : undefined).z, tails) : -1;
+    const candidateP = pFromZ(zTest(ctrlN, ctrlC, v(candidate.id + '-n'), v(candidate.id + '-c')).z, tails);
+    const selectedP = selected ? pFromZ(zTest(ctrlN, ctrlC, v(selected.id + '-n'), v(selected.id + '-c')).z, tails) : -1;
     return !selected || !Number.isFinite(candidateP) || candidateP > selectedP ? candidate : selected;
   }, null);
   const N1 = ctrlN, N2 = forecastVariant ? v(forecastVariant.id + '-n') : 0;
@@ -711,16 +694,13 @@ function renderCharts() {
   const planningVariant = variants.reduce((smallest, candidate) =>
     !smallest || v(candidate.id + '-n') < v(smallest.id + '-n') ? candidate : smallest, null);
   const planningN2 = planningVariant ? v(planningVariant.id + '-n') : 0;
-  const planningKnownVariance = planningVariant && isCountMode() ? explicitGroupVariance(planningVariant.id) : undefined;
   const planningF2 = recent ? Math.min(...recent.rates.slice(1)) : planningN2 / since;
   const nAt = u => (u <= since ? [u * N1 / since, u * planningN2 / since] : [N1 + (u - since) * f1, planningN2 + (u - since) * planningF2]);
   const totalAt = u => (u <= since ? u * totalVis / since : totalVis + (u - since) * fTotal);
   const evidenceAt = (u, uplift = observedUplift, multiplier = 1) => projectedPValue(
-    N1, ctrlC, N2, C2, f1 * multiplier, f2 * multiplier, Math.max(0, u - since), uplift, tails,
-    ctrlKnownVariance, forecastVariant && isCountMode() ? explicitGroupVariance(forecastVariant.id) : undefined);
+    N1, ctrlC, N2, C2, f1 * multiplier, f2 * multiplier, Math.max(0, u - since), uplift, tails);
   const confAt = u => { const p = evidenceAt(u); return p === null ? null : (1 - p) * 100; };
-  const powerAt = u => powerFromN(...nAt(u), p1, p2, 1 - targetConf, tails,
-    ctrlKnownVariance, planningKnownVariance);
+  const powerAt = u => powerFromN(...nAt(u), p1, p2, 1 - targetConf, tails);
   document.getElementById('currentPower').textContent = powerAt(since) === null ? 'Power unavailable for these assumptions' : `Calculated power: ${fmt(powerAt(since),1)}% for the assumed ${fmt(expectedUplift*100,1)}% relative effect and ${N1.toLocaleString()} / ${planningN2.toLocaleString()} visitors (control / smallest variant).`;
 
   const hasEffect = p1 > 0 && expectedUplift !== 0;
@@ -1156,7 +1136,8 @@ function buildStateParams() {
   const name = document.getElementById('testName').value.trim();
   if (name) p.set('name', name);
   p.set('metric', isCountMode() ? 'count' : 'binary');
-  p.set('disp', document.getElementById('dispersionFactor').value);
+  const sd = document.getElementById('sdPerVisitor').value;
+  if (sd !== '') p.set('sd', sd);
   p.set('scale', pChartScale());
   p.set('vis',   document.getElementById('sTotalVis').value);
   p.set('conf',  document.querySelector('input[name="sConf"]:checked')?.value || '0.95');
@@ -1165,8 +1146,6 @@ function buildStateParams() {
   p.set('cd',    document.getElementById('ctrl-dist').value);
   p.set('cn',    document.getElementById('ctrl-n').value);
   p.set('cc',    document.getElementById('ctrl-c').value);
-  const controlSd = document.getElementById('ctrl-sd').value;
-  if (controlSd !== '') p.set('csd', controlSd);
   p.set('since', document.getElementById('scSince').value);
   const start = document.getElementById('scSinceDate').value;
   if (start) p.set('start', start);
@@ -1182,8 +1161,6 @@ function buildStateParams() {
     p.set(`vd${i}`, document.getElementById(vr.id + '-dist').value);
     p.set(`vn${i}`, document.getElementById(vr.id + '-n').value);
     p.set(`vc${i}`, document.getElementById(vr.id + '-c').value);
-    const sd = document.getElementById(vr.id + '-sd').value;
-    if (sd !== '') p.set(`vsd${i}`, sd);
   });
   // Daily data last: it's by far the longest part of the link
   const dz = deepData ? deepEncoded : deepPending;
@@ -1212,10 +1189,12 @@ function restoreFromParams() {
     toggle.checked = p.get('scale') === 'logarithmic';
   });
   _restoring = true;
-  document.getElementById('metricMode').checked = p.get('metric') === 'count';
-  if (p.has('disp')) document.getElementById('dispersionFactor').value = p.get('disp');
+  document.querySelector(`input[name="sMetric"][value="${p.get('metric') === 'count' ? 'count' : 'binary'}"]`).checked = true;
+  if (p.has('sd')) document.getElementById('sdPerVisitor').value = p.get('sd');
+  legacyDispIgnored = p.has('disp');
   updateTestName();
   _restoring = false;
+  updateMetricModeUI();
   if (!p.has('vis')) return false;
 
   _restoring = true;
@@ -1261,12 +1240,10 @@ function restoreFromParams() {
     setKnobDisplay(vr.id, parseInt(p.get(`vd${i}`)) || 50);
     document.getElementById(vr.id + '-n').value = p.get(`vn${i}`) || 5000;
     document.getElementById(vr.id + '-c').value = p.get(`vc${i}`) || 0;
-    if (p.has(`vsd${i}`)) document.getElementById(vr.id + '-sd').value = p.get(`vsd${i}`);
   });
   setKnobDisplay('ctrl', parseInt(p.get('cd')) || 50);
   document.getElementById('ctrl-n').value = p.get('cn') || 5000;
   document.getElementById('ctrl-c').value = p.get('cc') || 250;
-  if (p.has('csd')) document.getElementById('ctrl-sd').value = p.get('csd');
   document.getElementById('sTotalVis').value = p.get('vis');
   updateMetricModeUI();
 

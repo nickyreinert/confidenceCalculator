@@ -246,6 +246,94 @@ function closeImport() {
   document.getElementById('importDialog').close();
 }
 
+function openSdCalculator() {
+  const dialog = document.getElementById('sdCalculatorDialog');
+  if (!dialog.open) dialog.showModal();
+  document.getElementById('sdVisitorTable').focus();
+  onSdTableInput();
+}
+
+function closeSdCalculator() {
+  document.getElementById('sdCalculatorDialog').close();
+}
+
+function onSdTableInput() {
+  const status = document.getElementById('sdTableStatus');
+  const apply = document.getElementById('sdApply');
+  const rows = splitTable(document.getElementById('sdVisitorTable').value);
+  const fail = message => {
+    status.className = 'import-status import-status--err';
+    status.textContent = message;
+    apply.disabled = true;
+    delete apply.dataset.sd;
+  };
+  if (!rows.length) {
+    status.className = 'import-status';
+    status.textContent = 'Enter visitor-level values to check the table.';
+    apply.disabled = true;
+    delete apply.dataset.sd;
+    return;
+  }
+  if (rows.some(row => row.filter(cell => cell !== '').length !== 1)) {
+    fail('Use a single column with one value per visitor.');
+    return;
+  }
+  const cells = rows.map(row => row.find(cell => cell !== '') ?? '');
+  if (cells.length && !parseNumberCell(cells[0])) {
+    if (!/visitor|conversion|event|value|count/i.test(cells[0])) {
+      fail('Use numeric visitor values; an optional first-row header should identify the values.');
+      return;
+    }
+    cells.shift();
+  }
+  if (!cells.length) {
+    fail('No visitor values found.');
+    return;
+  }
+  const values = [];
+  for (const cell of cells) {
+    const parsed = parseNumberCell(cell);
+    if (!parsed || parsed.isPct || !Number.isSafeInteger(parsed.value) || parsed.value < 0) {
+      fail('Every visitor value must be a non-negative whole number.');
+      return;
+    }
+    values.push(parsed.value);
+  }
+
+  const ids = allGroupIds();
+  const expectedVisitors = ids.reduce((sum, id) => sum + Number(document.getElementById(id + '-n').value), 0);
+  const expectedConversions = ids.reduce((sum, id) => sum + Number(document.getElementById(id + '-c').value), 0);
+  const sum = values.reduce((total, value) => total + value, 0);
+  if (values.length !== expectedVisitors || sum !== expectedConversions) {
+    fail(`Table mismatch: found ${values.length.toLocaleString()} visitors and ${sum.toLocaleString()} conversions; expected ${expectedVisitors.toLocaleString()} visitors and ${expectedConversions.toLocaleString()} conversions.`);
+    return;
+  }
+  if (values.length < 2) {
+    fail('At least two visitor values are needed to estimate a sample SD.');
+    return;
+  }
+
+  let mean = 0, squaredDifferences = 0;
+  values.forEach((value, index) => {
+    const delta = value - mean;
+    mean += delta / (index + 1);
+    squaredDifferences += delta * (value - mean);
+  });
+  const sd = Math.sqrt(squaredDifferences / (values.length - 1));
+  status.className = 'import-status import-status--ok';
+  status.textContent = `✓ Consistent: ${values.length.toLocaleString()} visitors, ${sum.toLocaleString()} conversions. Sample SD per visitor: ${sd.toPrecision(6)}.`;
+  apply.disabled = false;
+  apply.dataset.sd = String(sd);
+}
+
+function applyCalculatedSd() {
+  const sd = Number(document.getElementById('sdApply').dataset.sd);
+  if (!Number.isFinite(sd) || sd < 0) return;
+  document.getElementById('sdPerVisitor').value = String(sd);
+  setMetricMode('count');
+  closeSdCalculator();
+}
+
 function fillSelect(sel, options, selected) {
   sel.innerHTML = options.map(o => `<option value="${o.value}">${escapeHtml(o.label)}</option>`).join('');
   sel.value = String(selected);
@@ -317,7 +405,7 @@ function renderImportPreview() {
   const msgs = [];
   if (groups.length > IMPORT_MAX_GROUPS) msgs.push(`Only the first ${IMPORT_MAX_GROUPS - 1} variants are imported (max. 5).`);
   if (sameCol) msgs.push('Visitors and conversions use the same column.');
-  msgs.push('Aggregate imports use count mode; per-visitor SD is unavailable, so the Poisson fallback applies unless you enter SDs.');
+  msgs.push('Aggregate imports use count mode; visitor-level SD is not included. Enter or calculate one before statistical results are available.');
   status.className = 'import-status' + (sameCol ? ' import-status--err' : msgs.length ? ' import-status--warn' : ' import-status--ok');
   const daily = importModel.daily;
   const dailyTxt = daily
@@ -354,11 +442,8 @@ function applyImport() {
   for (let i = 1; i < groups.length; i++) addVariant();
 
   const ids = allGroupIds();
-  document.getElementById('metricMode').checked = true;
-  ids.forEach(id => {
-    const sd = document.getElementById(id + '-sd');
-    if (sd) sd.value = '';
-  });
+  document.querySelector('input[name="sMetric"][value="count"]').checked = true;
+  document.getElementById('sdPerVisitor').value = '';
   const total = groups.reduce((s, g) => s + g.n, 0);
   groups.forEach((g, i) => {
     document.getElementById(ids[i] + '-n').value = g.n;
